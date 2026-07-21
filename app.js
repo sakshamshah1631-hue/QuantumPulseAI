@@ -2111,7 +2111,7 @@ function renderStoryMoviePlayer(storyData, prompt) {
       imgEl.src = scene.imageUrl;
       imgEl.style.opacity = "1";
       imgEl.classList.toggle("zoom", idx % 2 === 1);
-    }, 200);
+    }, 150);
 
     subEl.textContent = scene.narration;
     timeEl.textContent = `Scene ${idx + 1} / ${totalScenes} (${isHindi ? "हिंदी Voiceover" : "Audio Story"})`;
@@ -2119,40 +2119,41 @@ function renderStoryMoviePlayer(storyData, prompt) {
   }
 
   function speakNarration(text, onEnd) {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const ut = new SpeechSynthesisUtterance(text);
-      
-      // Hindi voice selection logic
-      if (isHindi || /[\u0900-\u097F]/.test(text)) {
-        ut.lang = 'hi-IN';
-        const voices = window.speechSynthesis.getVoices();
-        const hindiVoice = voices.find(v => v.lang.includes('hi') || v.name.toLowerCase().includes('hindi'));
-        if (hindiVoice) ut.voice = hindiVoice;
-        ut.rate = 0.95;
-      } else {
-        ut.rate = 0.95;
-        ut.pitch = 1.0;
+    let finished = false;
+    const finish = () => {
+      if (!finished) {
+        finished = true;
+        if (speechTimer) clearTimeout(speechTimer);
+        if (isPlaying) onEnd();
       }
-      
-      let ended = false;
-      const finish = () => {
-        if (!ended) {
-          ended = true;
-          if (speechTimer) clearTimeout(speechTimer);
-          if (isPlaying) onEnd();
+    };
+
+    // Calculate natural duration based on text length (4.5s to 7s)
+    const sceneDuration = Math.max(4500, Math.min(8000, text.length * 110));
+    speechTimer = setTimeout(finish, sceneDuration);
+
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const ut = new SpeechSynthesisUtterance(text);
+        
+        if (isHindi || /[\u0900-\u097F]/.test(text)) {
+          ut.lang = 'hi-IN';
+          const voices = window.speechSynthesis.getVoices();
+          const hindiVoice = voices.find(v => v.lang.includes('hi') || v.name.toLowerCase().includes('hindi'));
+          if (hindiVoice) ut.voice = hindiVoice;
+          ut.rate = 0.95;
+        } else {
+          ut.rate = 0.95;
+          ut.pitch = 1.0;
         }
-      };
-
-      ut.onend = finish;
-      ut.onerror = finish;
-      
-      const secDuration = Math.max(5000, Math.min(10000, text.length * 150));
-      speechTimer = setTimeout(finish, secDuration);
-
-      window.speechSynthesis.speak(ut);
-    } else {
-      speechTimer = setTimeout(onEnd, 6000);
+        
+        ut.onend = finish;
+        ut.onerror = finish;
+        window.speechSynthesis.speak(ut);
+      } catch (e) {
+        console.warn("SpeechSynthesis error fallback:", e);
+      }
     }
   }
 
@@ -2178,20 +2179,23 @@ function renderStoryMoviePlayer(storyData, prompt) {
       isPlaying = true;
       playBtn.innerHTML = '<i class="fa-solid fa-pause"></i> <span>Pause</span>';
       if (currentSceneIdx >= totalScenes - 1) loadScene(0);
+      else loadScene(currentSceneIdx);
       speakNarration(storyData.scenes[currentSceneIdx].narration, playNextScene);
     }
   });
 
-  dlMovieBtn.addEventListener("click", () => downloadStoryMovieVideo(storyData, dlMovieBtn));
+  if (dlMovieBtn) dlMovieBtn.addEventListener("click", () => downloadStoryMovieVideo(storyData, dlMovieBtn));
   
-  dlImageBtn.addEventListener("click", () => {
-    const scene = storyData.scenes[currentSceneIdx];
-    const a = document.createElement("a");
-    a.href = scene.imageUrl;
-    a.download = `quantumpulse-scene-${currentSceneIdx + 1}-${Date.now()}.jpg`;
-    a.target = "_blank";
-    a.click();
-  });
+  if (dlImageBtn) {
+    dlImageBtn.addEventListener("click", () => {
+      const scene = storyData.scenes[currentSceneIdx];
+      const a = document.createElement("a");
+      a.href = scene.imageUrl;
+      a.download = `quantumpulse-scene-${currentSceneIdx + 1}-${Date.now()}.jpg`;
+      a.target = "_blank";
+      a.click();
+    });
+  }
 
   addMsg(card, "bot");
 }
@@ -2200,23 +2204,33 @@ function renderStoryMoviePlayer(storyData, prompt) {
 async function downloadStoryMovieVideo(storyData, dlBtn) {
   const origText = dlBtn.innerHTML;
   dlBtn.disabled = true;
-  dlBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Exporting Video...';
+  dlBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing Video...';
 
   try {
     const images = [];
-    for (const sc of storyData.scenes) {
+    const totalSc = storyData.scenes.length;
+
+    for (let i = 0; i < totalSc; i++) {
+      const sc = storyData.scenes[i];
+      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Loading Frames (${i + 1}/${totalSc})...`;
+      
       const proxyUrl = "https://wsrv.nl/?url=" + encodeURIComponent(sc.imageUrl) + "&output=webp";
       const img = await new Promise(resolve => {
         const i = new Image();
         i.crossOrigin = "anonymous";
         i.onload = () => resolve(i);
-        i.onerror = () => resolve(null);
+        i.onerror = () => {
+          // Direct fallback if proxy delays
+          const i2 = new Image();
+          i2.crossOrigin = "anonymous";
+          i2.onload = () => resolve(i2);
+          i2.onerror = () => resolve(null);
+          i2.src = sc.imageUrl;
+        };
         i.src = proxyUrl;
       });
-      if (img) images.push({ img, text: sc.narration });
+      images.push({ img, text: sc.narration, num: sc.sceneNumber });
     }
-
-    if (images.length === 0) throw new Error("Could not load scene images for video export.");
 
     const W = 1280, H = 720;
     const canvas = document.createElement("canvas");
@@ -2228,12 +2242,12 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
       : MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4";
 
     const stream = canvas.captureStream(30);
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 3000000 });
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 3500000 });
     const chunks = [];
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
     const FPS = 30;
-    const SECS_PER_SCENE = 3.5;
+    const SECS_PER_SCENE = 3.0; // 3 seconds per scene in video file
     const framesPerScene = Math.round(FPS * SECS_PER_SCENE);
 
     recorder.start(100);
@@ -2249,30 +2263,39 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
 
       const item = images[sceneIdx];
       const progress = frameIdx / framesPerScene;
-      const zoom = 1 + 0.08 * progress;
+      const zoom = 1 + 0.06 * progress;
 
-      ctx.globalAlpha = 1.0;
-      const offX = ((zoom - 1) * W) / 2;
-      const offY = ((zoom - 1) * H) / 2;
-      ctx.drawImage(item.img, -offX, -offY, W * zoom, H * zoom);
+      if (item.img) {
+        ctx.globalAlpha = 1.0;
+        const offX = ((zoom - 1) * W) / 2;
+        const offY = ((zoom - 1) * H) / 2;
+        ctx.drawImage(item.img, -offX, -offY, W * zoom, H * zoom);
+      } else {
+        // Fallback dark gradient canvas if image load was blocked
+        const grad = ctx.createLinearGradient(0, 0, W, H);
+        grad.addColorStop(0, "#0f0c21");
+        grad.addColorStop(1, "#1a103c");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+      }
 
-      // Subtitle box
-      ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
-      ctx.fillRect(0, H - 130, W, 130);
+      // Subtitle Bar Background
+      ctx.fillStyle = "rgba(0, 0, 0, 0.82)";
+      ctx.fillRect(0, H - 140, W, 140);
 
-      // Subtitle text
+      // Subtitle Text
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 26px 'Plus Jakarta Sans', sans-serif";
       ctx.textAlign = "center";
-      ctx.shadowColor = "rgba(0,0,0,0.8)";
-      ctx.shadowBlur = 6;
+      ctx.shadowColor = "rgba(0,0,0,0.9)";
+      ctx.shadowBlur = 8;
 
       const words = item.text.split(" ");
       let line = "";
       let lines = [];
       for (const w of words) {
         let test = line + w + " ";
-        if (ctx.measureText(test).width > W - 120) {
+        if (ctx.measureText(test).width > W - 140) {
           lines.push(line);
           line = w + " ";
         } else {
@@ -2281,16 +2304,23 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
       }
       lines.push(line);
 
-      let textY = H - 95 + (lines.length === 1 ? 20 : 0);
+      let textY = H - 100 + (lines.length === 1 ? 20 : 0);
       lines.slice(0, 2).forEach((l, i) => {
-        ctx.fillText(l.trim(), W / 2, textY + i * 34);
+        ctx.fillText(l.trim(), W / 2, textY + i * 36);
       });
 
-      // Watermark
-      ctx.font = "bold 18px 'Plus Jakarta Sans', sans-serif";
+      // Top Title Bar
+      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.fillRect(0, 0, W, 50);
+
+      ctx.font = "bold 20px 'Plus Jakarta Sans', sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#fef08a";
+      ctx.fillText(`📖 ${storyData.title || "AI Story Movie"} — Scene ${sceneIdx + 1}/${totalSc}`, 30, 32);
+
       ctx.textAlign = "right";
-      ctx.fillStyle = "rgba(245, 158, 11, 0.9)";
-      ctx.fillText("QuantumPulse AI Story", W - 30, 45);
+      ctx.fillStyle = "#f59e0b";
+      ctx.fillText("QuantumPulse AI", W - 30, 32);
 
       frameIdx++;
       if (frameIdx >= framesPerScene) {
@@ -2312,7 +2342,8 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
       a.click();
 
       dlBtn.disabled = false;
-      dlBtn.innerHTML = origText;
+      dlBtn.innerHTML = '<i class="fa-solid fa-check"></i> Download Complete!';
+      setTimeout(() => { dlBtn.innerHTML = origText; }, 3000);
     };
 
     renderNextFrame();
