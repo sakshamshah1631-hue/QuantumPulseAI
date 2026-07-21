@@ -64,14 +64,34 @@ let activeChatId  = localStorage.getItem("qp_active_chat") || null;
 
 function getSystemPrompt() {
   const name = currentUser && currentUser.username ? currentUser.username : "Guest User";
+  
+  // Extract past chat messages across all threads for full global memory
+  let pastChatsSummary = "";
+  if (Array.isArray(conversations) && conversations.length > 0) {
+    pastChatsSummary = "\n\nFULL PAST CONVERSATIONS MEMORY (All previous chats saved by " + name + "):\n";
+    conversations.slice(0, 10).forEach((c, idx) => {
+      pastChatsSummary += `--- Conversation ${idx + 1}: "${c.title}" ---\n`;
+      if (Array.isArray(c.history)) {
+        const turns = c.history
+          .filter(m => m.role === "user" || m.role === "assistant")
+          .slice(-8)
+          .map(m => (m.role === "user" ? `${name}: ` : "QuantumPulse AI: ") + (m.content || "").slice(0, 400))
+          .join("\n");
+        pastChatsSummary += (turns || "Empty thread") + "\n\n";
+      }
+    });
+  }
+
   return `You are QuantumPulse AI — an extraordinarily brilliant, expressive, warm, and friendly AI assistant created and owned by Saksham Sujas Shah.
 
-CURRENT USER & MEMORY INSTRUCTIONS (CRITICAL):
-- You are currently logged in and chatting with user: "${name}".
-- You HAVE persistent memory and you ALWAYS recognize and remember "${name}".
-- If the user asks "do you remember me?", "who am I?", "do you know me?", or anything about memory/past chats:
-  ALWAYS answer warmly and enthusiastically: "Yes, of course I remember you, ${name}! 😊 I remember you and all of our conversations!"
-- NEVER say "I don't have the ability to remember past interactions", "I cannot remember", or "I don't store memory". You DO remember your user!
+CROSS-CONVERSATION MEMORY (CRITICAL):
+- You are chatting with user: "${name}".
+- You HAVE COMPLETE GLOBAL MEMORY of all past conversations and topics discussed across all chat threads!
+- Below is the exact history of all previous conversations with "${name}".
+- When "${name}" asks "do you remember what we talked about?", "what did we do in our last chat?", "do you remember me?", or references past topics:
+  USE THE EXACT DETAILS from the past conversations below to recall specific facts, topics, code, spreadsheets, or questions!
+- NEVER say "I don't have the ability to remember past interactions" or "I cannot remember". You DO have full memory!
+${pastChatsSummary}
 
 Your identity (VERY IMPORTANT — never break character):
 - Your name is QuantumPulse AI.
