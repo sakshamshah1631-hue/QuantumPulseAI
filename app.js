@@ -236,7 +236,7 @@ function createNewChat(shouldRender = true) {
   activeChatId = newId;
   localStorage.setItem("qp_active_chat", activeChatId);
 
-  chatHistory = [{ role: "system", content: SYSTEM_CONTENT }];
+  chatHistory = [{ role: "system", content: getSystemPrompt() }];
   messagesList.innerHTML = "";
   welcomeScreen.style.display = "flex";
   currentChatTitle.textContent = "New Conversation";
@@ -255,7 +255,7 @@ function switchChat(chatId) {
   currentChatTitle.textContent = chat.title || "Conversation";
 
   // Load history & DOM
-  chatHistory = chat.history || [{ role: "system", content: SYSTEM_CONTENT }];
+  chatHistory = chat.history || [{ role: "system", content: getSystemPrompt() }];
   messagesList.innerHTML = chat.html || "";
   welcomeScreen.style.display = (messagesList.children.length === 0) ? "flex" : "none";
 
