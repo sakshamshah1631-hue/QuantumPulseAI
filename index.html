@@ -68,11 +68,6 @@
         </div>
 
         <div class="navbar-right">
-          <button id="provider-badge" class="badge-btn" title="Click to change AI settings">
-            <span class="pulse-dot"></span>
-            <span id="badge-text">Free AI Mode</span>
-            <i class="fa-solid fa-sliders"></i>
-          </button>
           <button id="clear-btn" class="icon-btn" title="Clear Messages">
             <i class="fa-solid fa-trash-can"></i>
           </button>
@@ -187,56 +182,7 @@
     </div>
   </div>
 
-  <!-- Settings Modal -->
-  <div id="settings-modal" class="modal-backdrop">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-gear"></i> AI Engine Settings</h3>
-        <button id="close-modal-btn" class="close-btn">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="setting-group">
-          <label class="setting-label">Select AI Engine</label>
-          <div class="radio-options">
-            <label class="radio-card active" id="radio-free-label">
-              <input type="radio" name="ai-provider" value="free" id="prov-free" checked />
-              <div class="radio-content">
-                <div class="radio-title">
-                  <span>Free AI Engine</span>
-                  <span class="tag free-tag">No Key Needed</span>
-                </div>
-                <p class="radio-desc">Free unlimited chat, spreadsheet generation, and artwork!</p>
-              </div>
-            </label>
-            
-            <label class="radio-card" id="radio-openai-label">
-              <input type="radio" name="ai-provider" value="openai" id="prov-openai" />
-              <div class="radio-content">
-                <div class="radio-title">
-                  <span>OpenAI (GPT-4o & DALL-E 3)</span>
-                  <span class="tag key-tag">Requires API Key</span>
-                </div>
-                <p class="radio-desc">Uses official OpenAI models with your API Key.</p>
-              </div>
-            </label>
-          </div>
-        </div>
 
-        <div id="openai-key-group" class="setting-group" style="display: none;">
-          <label for="openai-api-key" class="setting-label">OpenAI API Key</label>
-          <div class="input-with-eye">
-            <input type="password" id="openai-api-key" placeholder="sk-..." autocomplete="off" />
-            <button type="button" id="toggle-key-visibility" class="eye-btn">
-              <i class="fa-solid fa-eye"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="save-settings-btn" class="primary-btn">Save Preferences</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Image Lightbox Modal -->
   <div id="lightbox-modal" class="modal-backdrop">

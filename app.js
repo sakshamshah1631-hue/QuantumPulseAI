@@ -311,39 +311,12 @@ function escapeHTML(str) {
 }
 
 function updateProviderUI() {
-  const isOAI = currentProvider === PROVIDERS.OPENAI;
-  badgeText.textContent = isOAI ? "OpenAI Mode" : "Free AI Mode";
-  activeProvLabel.textContent = isOAI ? "Provider: OpenAI (GPT-4o)" : "Provider: QuantumPulse AI";
-  radioOpenAI.checked = isOAI;
-  radioFree.checked = !isOAI;
-  radioOpenAILabel.classList.toggle("active", isOAI);
-  radioFreeLabel.classList.toggle("active", !isOAI);
-  openaiKeyGroup.style.display = isOAI ? "flex" : "none";
-  openaiKeyInput.value = openaiKey;
+  if (activeProvLabel) {
+    activeProvLabel.textContent = "Provider: QuantumPulse AI";
+  }
 }
 
 function setupListeners() {
-  providerBadge.addEventListener("click", () => { updateProviderUI(); settingsModal.classList.add("active"); });
-  closeModalBtn.addEventListener("click",  () => settingsModal.classList.remove("active"));
-  settingsModal.addEventListener("click",  (e) => { if (e.target === settingsModal) settingsModal.classList.remove("active"); });
-
-  saveSettingsBtn.addEventListener("click", () => {
-    currentProvider = radioOpenAI.checked ? PROVIDERS.OPENAI : PROVIDERS.FREE;
-    openaiKey = openaiKeyInput.value.trim();
-    saveProvider(currentProvider); saveOpenAIKey(openaiKey);
-    updateProviderUI(); settingsModal.classList.remove("active");
-    sysMsg("Engine switched to " + (currentProvider === PROVIDERS.OPENAI ? "OpenAI GPT-4o" : "Pollinations AI") + ".");
-  });
-
-  radioFree.addEventListener("change",   () => { radioFreeLabel.classList.add("active"); radioOpenAILabel.classList.remove("active"); openaiKeyGroup.style.display = "none"; });
-  radioOpenAI.addEventListener("change", () => { radioOpenAILabel.classList.add("active"); radioFreeLabel.classList.remove("active"); openaiKeyGroup.style.display = "flex"; });
-
-  toggleKeyVisBtn.addEventListener("click", () => {
-    const t = openaiKeyInput.type === "password" ? "text" : "password";
-    openaiKeyInput.type = t;
-    toggleKeyVisBtn.querySelector("i").className = t === "password" ? "fa-solid fa-eye" : "fa-solid fa-eye-slash";
-  });
-
   modeToggleBtn.addEventListener("click", () => {
     if (currentMode === 'chat')       currentMode = 'image';
     else if (currentMode === 'image') currentMode = 'video';
@@ -354,7 +327,7 @@ function setupListeners() {
   clearBtn.addEventListener("click", () => {
     messagesList.innerHTML = "";
     welcomeScreen.style.display = "flex";
-    chatHistory = [{ role: "system", content: SYSTEM_CONTENT }];
+    chatHistory = [{ role: "system", content: getSystemPrompt() }];
   });
 
   document.querySelectorAll(".suggestion-card").forEach(c =>
