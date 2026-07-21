@@ -797,6 +797,41 @@ body {
   font-family: monospace;
 }
 
+.ai-story-download-bar {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.6rem 1.2rem;
+  background: rgba(12, 10, 24, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+.ai-story-dl-btn {
+  flex: 1;
+  min-width: 140px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--text-main);
+  padding: 0.45rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.ai-story-dl-btn:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: #f59e0b;
+  color: #fef08a;
+  transform: translateY(-1px);
+}
+
 .chat-form input {
   flex: 1;
   background: transparent;

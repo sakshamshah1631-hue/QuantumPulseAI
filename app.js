@@ -2084,6 +2084,15 @@ function renderStoryMoviePlayer(storyData, prompt) {
       </div>
       <div class="ai-story-time">Scene 1 / ${totalScenes} (${isHindi ? "हिंदी Voiceover" : "Audio Story"})</div>
     </div>
+
+    <div class="ai-story-download-bar">
+      <button class="ai-story-dl-btn dl-movie-btn">
+        <i class="fa-solid fa-file-video"></i> Download Movie (.mp4)
+      </button>
+      <button class="ai-story-dl-btn dl-image-btn">
+        <i class="fa-solid fa-download"></i> Save Scene Image
+      </button>
+    </div>
   `;
 
   const imgEl = card.querySelector(".ai-story-img");
@@ -2091,6 +2100,8 @@ function renderStoryMoviePlayer(storyData, prompt) {
   const playBtn = card.querySelector(".ai-story-play-btn");
   const progressFill = card.querySelector(".ai-story-progress-fill");
   const timeEl = card.querySelector(".ai-story-time");
+  const dlMovieBtn = card.querySelector(".dl-movie-btn");
+  const dlImageBtn = card.querySelector(".dl-image-btn");
 
   function loadScene(idx) {
     currentSceneIdx = idx;
@@ -2136,7 +2147,6 @@ function renderStoryMoviePlayer(storyData, prompt) {
       ut.onend = finish;
       ut.onerror = finish;
       
-      // Calculate dynamic timing based on text length (approx 5-7s per scene)
       const secDuration = Math.max(5000, Math.min(10000, text.length * 150));
       speechTimer = setTimeout(finish, secDuration);
 
@@ -2171,6 +2181,148 @@ function renderStoryMoviePlayer(storyData, prompt) {
       speakNarration(storyData.scenes[currentSceneIdx].narration, playNextScene);
     }
   });
+
+  dlMovieBtn.addEventListener("click", () => downloadStoryMovieVideo(storyData, dlMovieBtn));
+  
+  dlImageBtn.addEventListener("click", () => {
+    const scene = storyData.scenes[currentSceneIdx];
+    const a = document.createElement("a");
+    a.href = scene.imageUrl;
+    a.download = `quantumpulse-scene-${currentSceneIdx + 1}-${Date.now()}.jpg`;
+    a.target = "_blank";
+    a.click();
+  });
+
+  addMsg(card, "bot");
+}
+
+// ─── DOWNLOAD STORY MOVIE VIDEO EXPORTER ─────────────────
+async function downloadStoryMovieVideo(storyData, dlBtn) {
+  const origText = dlBtn.innerHTML;
+  dlBtn.disabled = true;
+  dlBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Exporting Video...';
+
+  try {
+    const images = [];
+    for (const sc of storyData.scenes) {
+      const proxyUrl = "https://wsrv.nl/?url=" + encodeURIComponent(sc.imageUrl) + "&output=webp";
+      const img = await new Promise(resolve => {
+        const i = new Image();
+        i.crossOrigin = "anonymous";
+        i.onload = () => resolve(i);
+        i.onerror = () => resolve(null);
+        i.src = proxyUrl;
+      });
+      if (img) images.push({ img, text: sc.narration });
+    }
+
+    if (images.length === 0) throw new Error("Could not load scene images for video export.");
+
+    const W = 1280, H = 720;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d");
+
+    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+      ? "video/webm;codecs=vp9"
+      : MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4";
+
+    const stream = canvas.captureStream(30);
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 3000000 });
+    const chunks = [];
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+    const FPS = 30;
+    const SECS_PER_SCENE = 3.5;
+    const framesPerScene = Math.round(FPS * SECS_PER_SCENE);
+
+    recorder.start(100);
+
+    let sceneIdx = 0;
+    let frameIdx = 0;
+
+    function renderNextFrame() {
+      if (sceneIdx >= images.length) {
+        recorder.stop();
+        return;
+      }
+
+      const item = images[sceneIdx];
+      const progress = frameIdx / framesPerScene;
+      const zoom = 1 + 0.08 * progress;
+
+      ctx.globalAlpha = 1.0;
+      const offX = ((zoom - 1) * W) / 2;
+      const offY = ((zoom - 1) * H) / 2;
+      ctx.drawImage(item.img, -offX, -offY, W * zoom, H * zoom);
+
+      // Subtitle box
+      ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
+      ctx.fillRect(0, H - 130, W, 130);
+
+      // Subtitle text
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 26px 'Plus Jakarta Sans', sans-serif";
+      ctx.textAlign = "center";
+      ctx.shadowColor = "rgba(0,0,0,0.8)";
+      ctx.shadowBlur = 6;
+
+      const words = item.text.split(" ");
+      let line = "";
+      let lines = [];
+      for (const w of words) {
+        let test = line + w + " ";
+        if (ctx.measureText(test).width > W - 120) {
+          lines.push(line);
+          line = w + " ";
+        } else {
+          line = test;
+        }
+      }
+      lines.push(line);
+
+      let textY = H - 95 + (lines.length === 1 ? 20 : 0);
+      lines.slice(0, 2).forEach((l, i) => {
+        ctx.fillText(l.trim(), W / 2, textY + i * 34);
+      });
+
+      // Watermark
+      ctx.font = "bold 18px 'Plus Jakarta Sans', sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillStyle = "rgba(245, 158, 11, 0.9)";
+      ctx.fillText("QuantumPulse AI Story", W - 30, 45);
+
+      frameIdx++;
+      if (frameIdx >= framesPerScene) {
+        sceneIdx++;
+        frameIdx = 0;
+      }
+
+      setTimeout(renderNextFrame, 1000 / FPS);
+    }
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const ext = mimeType.includes("webm") ? ".webm" : ".mp4";
+      
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `quantumpulse-ai-story-${Date.now()}${ext}`;
+      a.click();
+
+      dlBtn.disabled = false;
+      dlBtn.innerHTML = origText;
+    };
+
+    renderNextFrame();
+
+  } catch (err) {
+    alert("Video download failed: " + err.message);
+    dlBtn.disabled = false;
+    dlBtn.innerHTML = origText;
+  }
+}
 
   addMsg(card, "bot");
 }
