@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuantumPulse AI | Cloud AI Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app-layout">
+    <!-- ── LEFT SIDEBAR (Conversations & Account Panel) ── -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-brand">
+          <div class="brand-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          <span class="brand-name">QuantumPulse AI</span>
+        </div>
+        <button id="new-chat-btn" class="new-chat-btn">
+          <i class="fa-solid fa-plus"></i> New Chat
+        </button>
+      </div>
+
+      <!-- Conversations Panel -->
+      <div class="conversations-panel">
+        <div class="panel-header">
+          <span><i class="fa-solid fa-clock-rotate-left"></i> Conversations</span>
+        </div>
+        <div id="conversations-list" class="conversations-list">
+          <!-- Dynamic conversation items inserted here -->
+        </div>
+      </div>
+
+      <!-- Account Panel -->
+      <div class="account-panel">
+        <div id="user-profile" class="user-profile">
+          <div class="user-avatar" id="user-avatar-img"><i class="fa-solid fa-user"></i></div>
+          <div class="user-info">
+            <span id="user-name" class="user-name">Guest User</span>
+            <span id="user-status" class="user-status"><i class="fa-solid fa-circle"></i> Offline Mode</span>
+          </div>
+        </div>
+        <button id="auth-btn" class="auth-btn" title="Sign In / Register">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign In
+        </button>
+      </div>
+    </aside>
+
+    <!-- Sidebar Backdrop for Mobile -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+    <!-- ── MAIN CHAT WORKSPACE (Gemini Style Wide View) ── -->
+    <main class="main-workspace">
+      <!-- Navbar / Top Header -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button id="toggle-sidebar-btn" class="icon-btn mobile-only" title="Toggle Sidebar">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div class="current-chat-info">
+            <h2 id="current-chat-title">New Conversation</h2>
+            <span class="creator-tag">by Saksham Sujas Shah</span>
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button id="provider-badge" class="badge-btn" title="Click to change AI settings">
+            <span class="pulse-dot"></span>
+            <span id="badge-text">Free AI Mode</span>
+            <i class="fa-solid fa-sliders"></i>
+          </button>
+          <button id="clear-btn" class="icon-btn" title="Clear Messages">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Messages Container -->
+      <div class="chat-workspace">
+        <!-- Welcome Screen (Visible on empty chat) -->
+        <div id="welcome-screen" class="welcome-screen">
+          <div class="welcome-hero">
+            <div class="sparkle-avatar">
+              <i class="fa-solid fa-robot"></i>
+            </div>
+            <h1>Hello! How can I help you today? ✨</h1>
+            <p>I can generate complex <strong>Excel Dashboards</strong> 📊, write creative code 💻, generate AI art 🎨, or answer any questions!</p>
+          </div>
+          <div class="suggestions-grid">
+            <button class="suggestion-card" data-prompt="Create a regional sales performance report with status and revenue">
+              <i class="fa-solid fa-file-excel card-icon"></i>
+              <span>📊 Create Regional Sales Dashboard</span>
+            </button>
+            <button class="suggestion-card" data-prompt="/image Cyberpunk neon city in rain, futuristic hyper-realistic 8k artwork">
+              <i class="fa-solid fa-image card-icon"></i>
+              <span>🎨 /image Cyberpunk neon city</span>
+            </button>
+            <button class="suggestion-card" data-prompt="Explain quantum computing with emojis and simple real-life examples">
+              <i class="fa-solid fa-brain card-icon"></i>
+              <span>💡 Explain Quantum Computing</span>
+            </button>
+            <button class="suggestion-card" data-prompt="Write a modern web application architecture plan with best practices">
+              <i class="fa-solid fa-code card-icon"></i>
+              <span>💻 Web App Architecture Plan</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Messages Thread -->
+        <div id="messages" class="messages-list"></div>
+
+        <!-- Floating Input Container -->
+        <div class="input-container">
+          <div id="file-preview-area" class="file-preview-area" style="display:none;"></div>
+
+          <form id="chat-form" class="chat-form">
+            <button type="button" id="mode-toggle-btn" class="mode-toggle-btn" title="Cycle: Chat → Image → Video">
+              <i class="fa-solid fa-message" id="mode-icon"></i>
+              <span id="mode-label">Chat</span>
+            </button>
+
+            <input type="file" id="file-input" multiple
+              accept="image/*,video/*,.pdf,.csv,.xls,.xlsx,.txt,.doc,.docx,.json,.md"
+              style="display:none;" />
+            <button type="button" id="upload-btn" class="upload-btn" title="Upload file (image, video, Excel, PDF, CSV, text)">
+              <i class="fa-solid fa-paperclip"></i>
+            </button>
+
+            <input 
+              type="text" 
+              id="user-input" 
+              placeholder="Ask QuantumPulse AI anything..." 
+              autocomplete="off" 
+            />
+            <button type="submit" id="send-btn" class="send-btn" title="Send message">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </form>
+
+          <div class="input-footer">
+            <span><i class="fa-solid fa-circle-info"></i> Upload files with <i class="fa-solid fa-paperclip"></i> &bull; Type <code>/image</code> or <code>/video</code> to generate media</span>
+            <span id="active-provider-label">Provider: QuantumPulse AI &mdash; by Saksham Sujas Shah</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ── AUTHENTICATION MODAL (Account & Device Sync) ── -->
+  <div id="auth-modal" class="modal-backdrop">
+    <div class="modal-card auth-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-shield"></i> Account & Sync</h3>
+        <button id="close-auth-modal" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="auth-hero">
+          <div class="auth-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+          <h4>Sign In to Sync Across Devices</h4>
+          <p>Login to save your conversations, access them from any device, and keep your history safe!</p>
+        </div>
+
+        <!-- Quick Username Login -->
+        <div class="setting-group">
+          <label class="setting-label">Choose your Username</label>
+          <div class="input-with-icon">
+            <i class="fa-solid fa-user input-icon"></i>
+            <input type="text" id="username-input" placeholder="Enter username (e.g. SakshamShah)" autocomplete="username" />
+          </div>
+        </div>
+
+        <button id="local-login-btn" class="primary-btn full-width">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i> Continue as User
+        </button>
+
+        <div class="divider"><span>OR</span></div>
+
+        <!-- Puter Cloud Auth -->
+        <button id="puter-login-btn" class="secondary-btn full-width">
+          <i class="fa-solid fa-cloud"></i> Sign In with Puter Account (Cloud Sync)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-gear"></i> AI Engine Settings</h3>
+        <button id="close-modal-btn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label class="setting-label">Select AI Engine</label>
+          <div class="radio-options">
+            <label class="radio-card active" id="radio-free-label">
+              <input type="radio" name="ai-provider" value="free" id="prov-free" checked />
+              <div class="radio-content">
+                <div class="radio-title">
+                  <span>Free AI Engine</span>
+                  <span class="tag free-tag">No Key Needed</span>
+                </div>
+                <p class="radio-desc">Free unlimited chat, spreadsheet generation, and artwork!</p>
+              </div>
+            </label>
+            
+            <label class="radio-card" id="radio-openai-label">
+              <input type="radio" name="ai-provider" value="openai" id="prov-openai" />
+              <div class="radio-content">
+                <div class="radio-title">
+                  <span>OpenAI (GPT-4o & DALL-E 3)</span>
+                  <span class="tag key-tag">Requires API Key</span>
+                </div>
+                <p class="radio-desc">Uses official OpenAI models with your API Key.</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div id="openai-key-group" class="setting-group" style="display: none;">
+          <label for="openai-api-key" class="setting-label">OpenAI API Key</label>
+          <div class="input-with-eye">
+            <input type="password" id="openai-api-key" placeholder="sk-..." autocomplete="off" />
+            <button type="button" id="toggle-key-visibility" class="eye-btn">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="save-settings-btn" class="primary-btn">Save Preferences</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Lightbox Modal -->
+  <div id="lightbox-modal" class="modal-backdrop">
+    <div class="lightbox-content">
+      <button id="close-lightbox" class="close-btn">&times;</button>
+      <img id="lightbox-img" src="" alt="Full view" />
+      <div class="lightbox-actions">
+        <a id="download-lightbox-btn" href="#" download="ai-generated-image.jpg" class="primary-btn">
+          <i class="fa-solid fa-download"></i> Download Full Image
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://js.puter.com/v2/"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
