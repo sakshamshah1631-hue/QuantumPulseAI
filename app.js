@@ -1924,47 +1924,49 @@ function renderVideo(result, prompt) {
   addMsg(card, "bot");
 }
 
-// ─── AI STORY MOVIE GENERATOR & PLAYER (60+ Seconds) ──────
+// ─── AI STORY MOVIE GENERATOR & PLAYER (Multi-Image, Hindi & Custom Duration) ──────
 async function generateAIStoryMovie(theme, updateProgress) {
-  if (updateProgress) updateProgress("✍️ Step 1/3: Writing 6-scene cinematic story script...");
+  // Detect language request (Hindi)
+  const isHindi = /hindi|हिंदी/i.test(theme) || /[\u0900-\u097F]/.test(theme);
+  
+  // Detect requested duration (30 sec vs 1 min vs 2 min)
+  let targetScenes = 10; // Default: 10 scenes (approx 60-75s)
+  let durLabel = "1+ Min Movie";
+  
+  if (/30\s*(sec|s|second)/i.test(theme)) {
+    targetScenes = 6;
+    durLabel = "30 Sec Movie";
+  } else if (/45\s*(sec|s|second)/i.test(theme)) {
+    targetScenes = 8;
+    durLabel = "45 Sec Movie";
+  } else if (/2\s*(min|minute)/i.test(theme)) {
+    targetScenes = 14;
+    durLabel = "2 Min Movie";
+  }
 
-  const storySystemPrompt = `You are an expert Hollywood AI Movie Director. Generate a rich, 6-scene story movie script based on this theme: "${theme}".
+  if (updateProgress) updateProgress(`✍️ Step 1/3: Writing ${targetScenes}-scene cinematic story script (${isHindi ? "Hindi" : "English"})...`);
+
+  const langInstruction = isHindi 
+    ? "CRITICAL: Write the story 'title' and all 'narration' texts in expressive, storytelling HINDI (Devanagari script). KEEP 'imagePrompt' FOR EVERY SCENE IN DETAILED ENGLISH so the image renderer produces stunning artwork."
+    : "Write the title and narration in engaging, expressive storytelling English.";
+
+  const storySystemPrompt = `You are an expert Hollywood AI Movie Director. Generate a rich, captivating ${targetScenes}-scene story movie script based on this theme: "${theme}".
+${langInstruction}
+
 Return ONLY a raw valid JSON object with NO markdown, NO code block markers, and NO backticks:
 {
   "title": "Movie Title",
+  "isHindi": ${isHindi},
+  "durLabel": "${durLabel}",
   "scenes": [
     {
       "sceneNumber": 1,
-      "narration": "Detailed storytelling voiceover text (approx 25-30 words, 10 seconds of spoken speech).",
-      "imagePrompt": "Detailed visual description of scene 1 artwork for 8K fantasy photorealistic renderer"
-    },
-    {
-      "sceneNumber": 2,
-      "narration": "Voiceover narration for scene 2...",
-      "imagePrompt": "Detailed visual description for scene 2..."
-    },
-    {
-      "sceneNumber": 3,
-      "narration": "Voiceover narration for scene 3...",
-      "imagePrompt": "Detailed visual description for scene 3..."
-    },
-    {
-      "sceneNumber": 4,
-      "narration": "Voiceover narration for scene 4...",
-      "imagePrompt": "Detailed visual description for scene 4..."
-    },
-    {
-      "sceneNumber": 5,
-      "narration": "Voiceover narration for scene 5...",
-      "imagePrompt": "Detailed visual description for scene 5..."
-    },
-    {
-      "sceneNumber": 6,
-      "narration": "Climactic voiceover narration for scene 6...",
-      "imagePrompt": "Detailed visual description for scene 6..."
+      "narration": "Captivating voiceover text for scene 1 (15-25 words).",
+      "imagePrompt": "Detailed visual description of scene 1 artwork in English for 8K photorealistic renderer"
     }
   ]
-}`;
+}
+Make sure to generate EXACTLY ${targetScenes} detailed scenes in the JSON array!`;
 
   let storyData;
   try {
@@ -1976,65 +1978,75 @@ Return ONLY a raw valid JSON object with NO markdown, NO code block markers, and
     storyData = JSON.parse(jsonMatch ? jsonMatch[0] : aiRawText);
   } catch (e) {
     console.warn("AI Story JSON parse error, using fallback template:", e);
-    storyData = getFallbackStoryData(theme);
+    storyData = getFallbackStoryData(theme, isHindi, targetScenes, durLabel);
   }
 
   if (!storyData || !Array.isArray(storyData.scenes) || storyData.scenes.length === 0) {
-    storyData = getFallbackStoryData(theme);
+    storyData = getFallbackStoryData(theme, isHindi, targetScenes, durLabel);
   }
 
-  // Step 2: Generate AI images for each scene
+  storyData.isHindi = isHindi;
+  storyData.durLabel = durLabel;
+
+  // Step 2: Generate AI artwork images for each scene
   const total = storyData.scenes.length;
   for (let i = 0; i < total; i++) {
     const sc = storyData.scenes[i];
     if (updateProgress) updateProgress(`🎨 Step 2/3: Generating AI scene artwork (${i + 1}/${total})...`);
     try {
-      sc.imageUrl = await genImage(sc.imagePrompt + ", cinematic lighting, 8k resolution fantasy photorealistic");
+      sc.imageUrl = await genImage(sc.imagePrompt + ", cinematic lighting, 8k resolution, vivid photorealistic fantasy masterpiece");
     } catch (err) {
-      sc.imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(sc.imagePrompt)}?width=1024&height=576&seed=${i + 1}`;
+      sc.imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(sc.imagePrompt)}?width=1024&height=576&seed=${i + 10}`;
     }
   }
 
-  if (updateProgress) updateProgress("🎬 Step 3/3: Assembling audio voiceover & 1+ minute movie player...");
+  if (updateProgress) updateProgress("🎬 Step 3/3: Assembling audio voiceover & interactive movie player...");
   return storyData;
 }
 
-function getFallbackStoryData(theme) {
-  const titleTheme = theme.slice(0, 30) || "The Great Journey";
+function getFallbackStoryData(theme, isHindi, targetScenes, durLabel) {
+  const scenes = [];
+  const count = targetScenes || 8;
+
+  const englishNarrations = [
+    `In a realm beyond imagination, the epic story of ${theme} began under a glowing twilight sky. An ancient power awakened, signaling a quest of a lifetime.`,
+    "Journeying across uncharted territories, our hero reached towering ancient temple ruins. Whispers of lost wisdom resonated through mystical fog.",
+    "Suddenly, a celestial storm erupted across the horizon. Radiant lightning illuminated hidden pathways leading deep into the crystal valley.",
+    "Standing before the central nexus of power, the hero channeled pure magical energy to restore balance and harmony.",
+    "As shadows vanished, the landscape transformed into a breathtaking sanctuary of golden light and blossoming neon flora.",
+    "The journey took an unexpected turn as an ancient guardian emerged, offering a sacred amulet of strength.",
+    "Crossing the bridge of stars, celestial wonders sparkled across the dark night sky, revealing the final destination.",
+    "With courage unwavering, the ultimate prophecy was fulfilled, unlocking infinite wisdom for the realm.",
+    "A celebration of light filled the kingdoms, reuniting long-lost allies under a radiant double rainbow.",
+    "And so, the legend was etched into history forever, inspiring future generations to dream beyond the stars."
+  ];
+
+  const hindiNarrations = [
+    `एक अनोखी दुनिया में, ${theme} की यह अद्भुत कहानी शाम के ढलते आसमान के नीचे शुरू हुई।`,
+    "अनजान रास्तों पर चलते हुए, हमारे नायक एक विशाल प्राचीन मंदिर के खंडहरों में पहुंचे।",
+    "अचानक आसमान में एक जादुई तूफ़ान आया, जिसकी रोशनी ने गुप्त रास्तों को खोल दिया।",
+    "शक्ति के मुख्य केंद्र के सामने खड़े होकर, नायक ने संसार में संतुलन बनाने के लिए अपनी जादुई ऊर्जा जगाई।",
+    "जैसे ही अंधेरा गायब हुआ, पूरी धरती सुनहरी रोशनी और सुंदर फूलों से खिल उठी।",
+    "सफ़र में एक नया मोड़ आया जब एक प्राचीन रक्षक ने नायक को सुरक्षा का एक पवित्र तावीज़ भेंट किया।",
+    "तारों के पुल को पार करते हुए, आसमान में दिव्य चमत्कार चमकने लगे।",
+    " अटूट साहस के साथ, प्राचीन भविष्यवाणी सच हुई और ज्ञान का महान द्वार खुल गया।",
+    "पूरे साम्राज्य में ख़ुशियों का माहौल छा गया और चारों तरफ़ विजय का जश्न मनाया गया।",
+    "और इस तरह, यह महान कहानी हमेशा के लिए इतिहास के पन्नों में अमर हो गई।"
+  ];
+
+  for (let i = 0; i < count; i++) {
+    scenes.push({
+      sceneNumber: i + 1,
+      narration: isHindi ? hindiNarrations[i % hindiNarrations.length] : englishNarrations[i % englishNarrations.length],
+      imagePrompt: `${theme}, cinematic scene ${i + 1}, fantasy atmosphere, glowing crystal sky, 8k resolution, dramatic angle`
+    });
+  }
+
   return {
-    title: "The Legend of " + titleTheme,
-    scenes: [
-      {
-        sceneNumber: 1,
-        narration: `In a realm beyond time, the epic story of ${theme} began under a glowing cosmic sky. An ancient energy awakened, signaling a quest that would change the universe forever.`,
-        imagePrompt: `${theme}, ancient twilight city, epic fantasy atmosphere, glowing crystal sky`
-      },
-      {
-        sceneNumber: 2,
-        narration: "Journeying across uncharted lands, our hero reached towering ancient temple ruins. Whispers of lost wisdom resonated through mystical fog and shimmering waterfalls.",
-        imagePrompt: `${theme}, epic ancient temple ruins, mystical glowing fog, majestic waterfall`
-      },
-      {
-        sceneNumber: 3,
-        narration: "Suddenly, a celestial storm surged across the horizon. Brilliant lightning illuminated secret pathways leading deep into the heart of the crystal mountain.",
-        imagePrompt: `${theme}, cosmic lightning storm over fantasy mountains, vibrant purple and gold energy`
-      },
-      {
-        sceneNumber: 4,
-        narration: "Standing before the central nexus of power, the hero channeled pure magical energy to restore harmony and push back the encroaching shadows.",
-        imagePrompt: `${theme}, heroic figure channeling glowing magical energy sphere, epic light beam`
-      },
-      {
-        sceneNumber: 5,
-        narration: "As darkness vanished, the landscape transformed into a breathtaking sanctuary of golden light, blossoming flora, and newfound hope.",
-        imagePrompt: `${theme}, radiant utopian paradise, golden sunlight, blooming neon flora`
-      },
-      {
-        sceneNumber: 6,
-        narration: "With peace restored, the legend was etched into history forever, inspiring future generations to dream beyond the horizon. The epic story was complete.",
-        imagePrompt: `${theme}, cinematic hero looking over futuristic golden city, triumphant sunset`
-      }
-    ]
+    title: isHindi ? `महागाथा: ${theme.slice(0, 25)}` : `The Legend of ${theme.slice(0, 25)}`,
+    isHindi,
+    durLabel,
+    scenes
   };
 }
 
@@ -2047,13 +2059,15 @@ function renderStoryMoviePlayer(storyData, prompt) {
   let isPlaying = false;
   let speechTimer = null;
 
+  const isHindi = storyData.isHindi || /[\u0900-\u097F]/.test(storyData.scenes[0].narration);
+
   card.innerHTML = `
     <div class="ai-story-header">
       <div class="ai-story-title">
         <i class="fa-solid fa-book-open" style="color:#f59e0b;"></i>
         <span>${escapeHTML(storyData.title || "AI Story Movie")}</span>
       </div>
-      <span class="ai-story-badge"><i class="fa-solid fa-film"></i> 1+ Min Movie</span>
+      <span class="ai-story-badge"><i class="fa-solid fa-film"></i> ${escapeHTML(storyData.durLabel || "1+ Min Movie")}</span>
     </div>
     
     <div class="ai-story-stage">
@@ -2066,9 +2080,9 @@ function renderStoryMoviePlayer(storyData, prompt) {
         <i class="fa-solid fa-play"></i> <span>Play Movie</span>
       </button>
       <div class="ai-story-progress-bar">
-        <div class="ai-story-progress-fill" style="width: 16%;"></div>
+        <div class="ai-story-progress-fill" style="width: ${(1 / totalScenes) * 100}%;"></div>
       </div>
-      <div class="ai-story-time">Scene 1 / ${totalScenes} (01:00+)</div>
+      <div class="ai-story-time">Scene 1 / ${totalScenes} (${isHindi ? "हिंदी Voiceover" : "Audio Story"})</div>
     </div>
   `;
 
@@ -2089,7 +2103,7 @@ function renderStoryMoviePlayer(storyData, prompt) {
     }, 200);
 
     subEl.textContent = scene.narration;
-    timeEl.textContent = `Scene ${idx + 1} / ${totalScenes} (01:00+)`;
+    timeEl.textContent = `Scene ${idx + 1} / ${totalScenes} (${isHindi ? "हिंदी Voiceover" : "Audio Story"})`;
     progressFill.style.width = `${((idx + 1) / totalScenes) * 100}%`;
   }
 
@@ -2097,8 +2111,18 @@ function renderStoryMoviePlayer(storyData, prompt) {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const ut = new SpeechSynthesisUtterance(text);
-      ut.rate = 0.92; // Expressive storytelling pace
-      ut.pitch = 1.0;
+      
+      // Hindi voice selection logic
+      if (isHindi || /[\u0900-\u097F]/.test(text)) {
+        ut.lang = 'hi-IN';
+        const voices = window.speechSynthesis.getVoices();
+        const hindiVoice = voices.find(v => v.lang.includes('hi') || v.name.toLowerCase().includes('hindi'));
+        if (hindiVoice) ut.voice = hindiVoice;
+        ut.rate = 0.95;
+      } else {
+        ut.rate = 0.95;
+        ut.pitch = 1.0;
+      }
       
       let ended = false;
       const finish = () => {
@@ -2112,12 +2136,13 @@ function renderStoryMoviePlayer(storyData, prompt) {
       ut.onend = finish;
       ut.onerror = finish;
       
-      // Fallback timer (10.5 seconds per scene minimum to guarantee 60+ sec duration)
-      speechTimer = setTimeout(finish, 10500);
+      // Calculate dynamic timing based on text length (approx 5-7s per scene)
+      const secDuration = Math.max(5000, Math.min(10000, text.length * 150));
+      speechTimer = setTimeout(finish, secDuration);
 
       window.speechSynthesis.speak(ut);
     } else {
-      speechTimer = setTimeout(onEnd, 10500);
+      speechTimer = setTimeout(onEnd, 6000);
     }
   }
 
