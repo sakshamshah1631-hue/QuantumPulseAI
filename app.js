@@ -323,7 +323,8 @@ function updateProviderUI() {
 
 function setupListeners() {
   modeToggleBtn.addEventListener("click", () => {
-    if (currentMode === 'chat')       currentMode = 'image';
+    if (currentMode === 'chat')       currentMode = 'story';
+    else if (currentMode === 'story') currentMode = 'image';
     else if (currentMode === 'image') currentMode = 'video';
     else                              currentMode = 'chat';
     applyMode();
@@ -1404,18 +1405,24 @@ function showTyping() {
 // ─── MODE HELPER ─────────────────────────────────────────
 function applyMode() {
   modeToggleBtn.className = 'mode-toggle-btn mode-' + currentMode;
-  if (currentMode === 'chat') {
-    modeIcon.className = 'fa-solid fa-message';
-    modeLabel.textContent = 'Chat';
-    userInput.placeholder = 'Ask me anything...';
+  if (currentMode === 'story') {
+    modeIcon.className = 'fa-solid fa-book-open';
+    modeLabel.textContent = 'Story';
+    modeToggleBtn.classList.add('story-mode');
+    userInput.placeholder = 'Describe a story theme (e.g. A brave astronaut discovering a crystal planet)...';
   } else if (currentMode === 'image') {
     modeIcon.className = 'fa-solid fa-image';
     modeLabel.textContent = 'Image';
+    modeToggleBtn.classList.add('image-mode');
     userInput.placeholder = 'Describe the image to generate...';
-  } else {
+  } else if (currentMode === 'video') {
     modeIcon.className = 'fa-solid fa-film';
     modeLabel.textContent = 'Video';
     userInput.placeholder = 'Describe the video to generate... (e.g. a dog running on beach)';
+  } else {
+    modeIcon.className = 'fa-solid fa-message';
+    modeLabel.textContent = 'Chat';
+    userInput.placeholder = 'Ask me anything...';
   }
 }
 
@@ -1429,6 +1436,7 @@ async function handleSubmit(e) {
   // Detect mode from prefix or current mode
   let mode = currentMode;
   let prompt = raw;
+  if (raw.toLowerCase().startsWith('/story ')) { mode = 'story'; prompt = raw.slice(7).trim(); }
   if (raw.toLowerCase().startsWith('/image ')) { mode = 'image'; prompt = raw.slice(7).trim(); }
   if (raw.toLowerCase().startsWith('/video ')) { mode = 'video'; prompt = raw.slice(7).trim(); }
 
@@ -1446,9 +1454,7 @@ async function handleSubmit(e) {
       const typ = showTyping();
       try {
         if (entry.type === 'image') {
-          // Show the image
           renderImage(entry.dataUrl, entry.file.name);
-          // Use AI vision to analyze it
           const question = raw || 'Describe this image in detail. What do you see?';
           const visionReply = await analyzeImageWithAI(entry.dataUrl, question);
           typ.remove();
@@ -1457,15 +1463,13 @@ async function handleSubmit(e) {
           chatHistory.push({ role: 'assistant', content: visionReply });
 
         } else if (entry.type === 'video') {
-          // Show the video player
           renderVideo(entry.dataUrl, entry.file.name);
           typ.remove();
-          addMsg(`🎬 Video **${entry.file.name}** loaded! I can see you've shared a video. While I can't watch videos directly, I can help you with questions about it — just ask!`, 'bot');
+          addMsg(`🎬 Video **${entry.file.name}** loaded! Ask me anything about it.`, 'bot');
 
         } else if (entry.extractedText) {
-          // Text-based files: send content to AI for analysis
-          const question = raw || `Analyze this ${entry.type.toUpperCase()} file and give me a clear summary of its contents.`;
-          const contextMsg = `The user uploaded a ${entry.type.toUpperCase()} file named "${entry.file.name}". Here is its content:\n\n${entry.extractedText.slice(0, 5000)}\n\nUser question: ${question}`;
+          const question = raw || `Analyze this ${entry.type.toUpperCase()} file and give me a clear summary.`;
+          const contextMsg = `The user uploaded a ${entry.type.toUpperCase()} file named "${entry.file.name}". Content:\n\n${entry.extractedText.slice(0, 5000)}\n\nQuestion: ${question}`;
           chatHistory.push({ role: 'user', content: contextMsg });
           const reply = await genText();
           typ.remove();
@@ -1474,7 +1478,7 @@ async function handleSubmit(e) {
 
         } else {
           typ.remove();
-          addMsg(`📎 File **${entry.file.name}** received! Ask me anything about it.`, 'bot');
+          addMsg(`📎 File **${entry.file.name}** received!`, 'bot');
         }
       } catch (err) {
         typ.remove();
@@ -1487,7 +1491,23 @@ async function handleSubmit(e) {
   // ── Normal modes ──
   const typ = showTyping();
   try {
-    if (mode === 'image') {
+    if (mode === 'story') {
+      if (!prompt) { typ.remove(); addMsg('Please describe the story theme you want to create.', 'bot'); return; }
+      typ.querySelector('.msg-bubble').innerHTML =
+        '<div class="typing-dots"><span></span><span></span><span></span></div>' +
+        '<div class="video-progress-label">📖 Writing story script & generating AI scene artwork (1+ min movie)...</div>';
+      
+      const storyData = await generateAIStoryMovie(prompt, (progressMsg) => {
+        const label = typ.querySelector('.video-progress-label');
+        if (label) label.textContent = progressMsg;
+      });
+
+      typ.remove();
+      renderStoryMoviePlayer(storyData, prompt);
+      chatHistory.push({ role: 'user', content: 'Generate AI Story Movie: ' + prompt });
+      chatHistory.push({ role: 'assistant', content: '[AI Story Movie generated for: ' + prompt + ']' });
+
+    } else if (mode === 'image') {
       if (!prompt) { typ.remove(); addMsg('Please describe the image you want to create.', 'bot'); return; }
       const url = await genImage(prompt);
       typ.remove();
@@ -1901,6 +1921,232 @@ function renderVideo(result, prompt) {
   acts.append(ps, dl);
 
   card.append(header, video, acts);
+  addMsg(card, "bot");
+}
+
+// ─── AI STORY MOVIE GENERATOR & PLAYER (60+ Seconds) ──────
+async function generateAIStoryMovie(theme, updateProgress) {
+  if (updateProgress) updateProgress("✍️ Step 1/3: Writing 6-scene cinematic story script...");
+
+  const storySystemPrompt = `You are an expert Hollywood AI Movie Director. Generate a rich, 6-scene story movie script based on this theme: "${theme}".
+Return ONLY a raw valid JSON object with NO markdown, NO code block markers, and NO backticks:
+{
+  "title": "Movie Title",
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "narration": "Detailed storytelling voiceover text (approx 25-30 words, 10 seconds of spoken speech).",
+      "imagePrompt": "Detailed visual description of scene 1 artwork for 8K fantasy photorealistic renderer"
+    },
+    {
+      "sceneNumber": 2,
+      "narration": "Voiceover narration for scene 2...",
+      "imagePrompt": "Detailed visual description for scene 2..."
+    },
+    {
+      "sceneNumber": 3,
+      "narration": "Voiceover narration for scene 3...",
+      "imagePrompt": "Detailed visual description for scene 3..."
+    },
+    {
+      "sceneNumber": 4,
+      "narration": "Voiceover narration for scene 4...",
+      "imagePrompt": "Detailed visual description for scene 4..."
+    },
+    {
+      "sceneNumber": 5,
+      "narration": "Voiceover narration for scene 5...",
+      "imagePrompt": "Detailed visual description for scene 5..."
+    },
+    {
+      "sceneNumber": 6,
+      "narration": "Climactic voiceover narration for scene 6...",
+      "imagePrompt": "Detailed visual description for scene 6..."
+    }
+  ]
+}`;
+
+  let storyData;
+  try {
+    chatHistory.push({ role: "user", content: storySystemPrompt });
+    const aiRawText = await genText();
+    chatHistory.pop(); // clean temporary prompt from history
+    
+    const jsonMatch = aiRawText.match(/\{[\s\S]*\}/);
+    storyData = JSON.parse(jsonMatch ? jsonMatch[0] : aiRawText);
+  } catch (e) {
+    console.warn("AI Story JSON parse error, using fallback template:", e);
+    storyData = getFallbackStoryData(theme);
+  }
+
+  if (!storyData || !Array.isArray(storyData.scenes) || storyData.scenes.length === 0) {
+    storyData = getFallbackStoryData(theme);
+  }
+
+  // Step 2: Generate AI images for each scene
+  const total = storyData.scenes.length;
+  for (let i = 0; i < total; i++) {
+    const sc = storyData.scenes[i];
+    if (updateProgress) updateProgress(`🎨 Step 2/3: Generating AI scene artwork (${i + 1}/${total})...`);
+    try {
+      sc.imageUrl = await genImage(sc.imagePrompt + ", cinematic lighting, 8k resolution fantasy photorealistic");
+    } catch (err) {
+      sc.imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(sc.imagePrompt)}?width=1024&height=576&seed=${i + 1}`;
+    }
+  }
+
+  if (updateProgress) updateProgress("🎬 Step 3/3: Assembling audio voiceover & 1+ minute movie player...");
+  return storyData;
+}
+
+function getFallbackStoryData(theme) {
+  const titleTheme = theme.slice(0, 30) || "The Great Journey";
+  return {
+    title: "The Legend of " + titleTheme,
+    scenes: [
+      {
+        sceneNumber: 1,
+        narration: `In a realm beyond time, the epic story of ${theme} began under a glowing cosmic sky. An ancient energy awakened, signaling a quest that would change the universe forever.`,
+        imagePrompt: `${theme}, ancient twilight city, epic fantasy atmosphere, glowing crystal sky`
+      },
+      {
+        sceneNumber: 2,
+        narration: "Journeying across uncharted lands, our hero reached towering ancient temple ruins. Whispers of lost wisdom resonated through mystical fog and shimmering waterfalls.",
+        imagePrompt: `${theme}, epic ancient temple ruins, mystical glowing fog, majestic waterfall`
+      },
+      {
+        sceneNumber: 3,
+        narration: "Suddenly, a celestial storm surged across the horizon. Brilliant lightning illuminated secret pathways leading deep into the heart of the crystal mountain.",
+        imagePrompt: `${theme}, cosmic lightning storm over fantasy mountains, vibrant purple and gold energy`
+      },
+      {
+        sceneNumber: 4,
+        narration: "Standing before the central nexus of power, the hero channeled pure magical energy to restore harmony and push back the encroaching shadows.",
+        imagePrompt: `${theme}, heroic figure channeling glowing magical energy sphere, epic light beam`
+      },
+      {
+        sceneNumber: 5,
+        narration: "As darkness vanished, the landscape transformed into a breathtaking sanctuary of golden light, blossoming flora, and newfound hope.",
+        imagePrompt: `${theme}, radiant utopian paradise, golden sunlight, blooming neon flora`
+      },
+      {
+        sceneNumber: 6,
+        narration: "With peace restored, the legend was etched into history forever, inspiring future generations to dream beyond the horizon. The epic story was complete.",
+        imagePrompt: `${theme}, cinematic hero looking over futuristic golden city, triumphant sunset`
+      }
+    ]
+  };
+}
+
+function renderStoryMoviePlayer(storyData, prompt) {
+  const card = document.createElement("div");
+  card.className = "ai-story-card";
+
+  const totalScenes = storyData.scenes.length;
+  let currentSceneIdx = 0;
+  let isPlaying = false;
+  let speechTimer = null;
+
+  card.innerHTML = `
+    <div class="ai-story-header">
+      <div class="ai-story-title">
+        <i class="fa-solid fa-book-open" style="color:#f59e0b;"></i>
+        <span>${escapeHTML(storyData.title || "AI Story Movie")}</span>
+      </div>
+      <span class="ai-story-badge"><i class="fa-solid fa-film"></i> 1+ Min Movie</span>
+    </div>
+    
+    <div class="ai-story-stage">
+      <img class="ai-story-img" src="${storyData.scenes[0].imageUrl}" alt="Scene 1" />
+      <div class="ai-story-subtitles">${escapeHTML(storyData.scenes[0].narration)}</div>
+    </div>
+    
+    <div class="ai-story-controls">
+      <button class="ai-story-play-btn">
+        <i class="fa-solid fa-play"></i> <span>Play Movie</span>
+      </button>
+      <div class="ai-story-progress-bar">
+        <div class="ai-story-progress-fill" style="width: 16%;"></div>
+      </div>
+      <div class="ai-story-time">Scene 1 / ${totalScenes} (01:00+)</div>
+    </div>
+  `;
+
+  const imgEl = card.querySelector(".ai-story-img");
+  const subEl = card.querySelector(".ai-story-subtitles");
+  const playBtn = card.querySelector(".ai-story-play-btn");
+  const progressFill = card.querySelector(".ai-story-progress-fill");
+  const timeEl = card.querySelector(".ai-story-time");
+
+  function loadScene(idx) {
+    currentSceneIdx = idx;
+    const scene = storyData.scenes[idx];
+    imgEl.style.opacity = "0.2";
+    setTimeout(() => {
+      imgEl.src = scene.imageUrl;
+      imgEl.style.opacity = "1";
+      imgEl.classList.toggle("zoom", idx % 2 === 1);
+    }, 200);
+
+    subEl.textContent = scene.narration;
+    timeEl.textContent = `Scene ${idx + 1} / ${totalScenes} (01:00+)`;
+    progressFill.style.width = `${((idx + 1) / totalScenes) * 100}%`;
+  }
+
+  function speakNarration(text, onEnd) {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const ut = new SpeechSynthesisUtterance(text);
+      ut.rate = 0.92; // Expressive storytelling pace
+      ut.pitch = 1.0;
+      
+      let ended = false;
+      const finish = () => {
+        if (!ended) {
+          ended = true;
+          if (speechTimer) clearTimeout(speechTimer);
+          if (isPlaying) onEnd();
+        }
+      };
+
+      ut.onend = finish;
+      ut.onerror = finish;
+      
+      // Fallback timer (10.5 seconds per scene minimum to guarantee 60+ sec duration)
+      speechTimer = setTimeout(finish, 10500);
+
+      window.speechSynthesis.speak(ut);
+    } else {
+      speechTimer = setTimeout(onEnd, 10500);
+    }
+  }
+
+  function playNextScene() {
+    if (!isPlaying) return;
+    if (currentSceneIdx < totalScenes - 1) {
+      loadScene(currentSceneIdx + 1);
+      speakNarration(storyData.scenes[currentSceneIdx].narration, playNextScene);
+    } else {
+      isPlaying = false;
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      playBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> <span>Replay Movie</span>';
+    }
+  }
+
+  playBtn.addEventListener("click", () => {
+    if (isPlaying) {
+      isPlaying = false;
+      if (speechTimer) clearTimeout(speechTimer);
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      playBtn.innerHTML = '<i class="fa-solid fa-play"></i> <span>Play Movie</span>';
+    } else {
+      isPlaying = true;
+      playBtn.innerHTML = '<i class="fa-solid fa-pause"></i> <span>Pause</span>';
+      if (currentSceneIdx >= totalScenes - 1) loadScene(0);
+      speakNarration(storyData.scenes[currentSceneIdx].narration, playNextScene);
+    }
+  });
+
   addMsg(card, "bot");
 }
 

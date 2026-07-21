@@ -657,10 +657,144 @@ body {
   background: rgba(255, 255, 255, 0.15);
 }
 
+.mode-toggle-btn.story-mode {
+  background: linear-gradient(135deg, #f59e0b, #ec4899);
+  color: #fff;
+  border: none;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+}
+
 .mode-toggle-btn.image-mode {
   background: linear-gradient(135deg, #ec4899, #8b5cf6);
   color: #fff;
   border: none;
+}
+
+/* ─── AI STORY MOVIE PLAYER ──────────────────────────────── */
+.ai-story-card {
+  background: rgba(15, 12, 33, 0.95);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(245, 158, 11, 0.15);
+  max-width: 680px;
+  width: 100%;
+  margin-top: 0.8rem;
+}
+
+.ai-story-header {
+  padding: 0.8rem 1.2rem;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.25), rgba(236, 72, 153, 0.25));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-story-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #fef08a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ai-story-badge {
+  background: #f59e0b;
+  color: #000;
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.ai-story-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #000;
+  overflow: hidden;
+}
+
+.ai-story-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.6s ease, transform 8s ease;
+  transform: scale(1.05);
+}
+
+.ai-story-img.zoom {
+  transform: scale(1.15);
+}
+
+.ai-story-subtitles {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1.2rem 1.5rem 1rem;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 70%, transparent 100%);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.4;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.ai-story-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.2rem;
+  background: rgba(8, 6, 18, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ai-story-play-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: none;
+  color: #fff;
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.ai-story-play-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+
+.ai-story-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  margin: 0 1rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.ai-story-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #f59e0b, #ec4899);
+  transition: width 0.3s linear;
+}
+
+.ai-story-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: monospace;
 }
 
 .chat-form input {
