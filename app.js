@@ -2337,9 +2337,10 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
     const canvasStream = canvas.captureStream(30);
 
     // Combine video stream and audio stream into a single MediaStream
+    const audioTracks = (audioDest && audioDest.stream) ? audioDest.stream.getAudioTracks() : [];
     const combinedStream = new MediaStream([
       ...canvasStream.getVideoTracks(),
-      ...audioDest.getAudioTracks()
+      ...audioTracks
     ]);
 
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
