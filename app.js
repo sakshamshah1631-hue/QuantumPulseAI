@@ -2404,7 +2404,4 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
   }
 }
 
-  addMsg(card, "bot");
-}
-
 document.addEventListener("DOMContentLoaded", init);
