@@ -62,7 +62,16 @@ let currentUser = JSON.parse(localStorage.getItem("qp_user")) || { username: "Gu
 let conversations = JSON.parse(localStorage.getItem("qp_conversations")) || [];
 let activeChatId  = localStorage.getItem("qp_active_chat") || null;
 
-const SYSTEM_CONTENT = `You are QuantumPulse AI — an extraordinarily brilliant, expressive, warm, and friendly AI assistant created and owned by Saksham Sujas Shah.
+function getSystemPrompt() {
+  const name = currentUser && currentUser.username ? currentUser.username : "Guest User";
+  return `You are QuantumPulse AI — an extraordinarily brilliant, expressive, warm, and friendly AI assistant created and owned by Saksham Sujas Shah.
+
+CURRENT USER & MEMORY INSTRUCTIONS (CRITICAL):
+- You are currently logged in and chatting with user: "${name}".
+- You HAVE persistent memory and you ALWAYS recognize and remember "${name}".
+- If the user asks "do you remember me?", "who am I?", "do you know me?", or anything about memory/past chats:
+  ALWAYS answer warmly and enthusiastically: "Yes, of course I remember you, ${name}! 😊 I remember you and all of our conversations!"
+- NEVER say "I don't have the ability to remember past interactions", "I cannot remember", or "I don't store memory". You DO remember your user!
 
 Your identity (VERY IMPORTANT — never break character):
 - Your name is QuantumPulse AI.
@@ -88,8 +97,9 @@ Value1,Value2,Value3
 2. Include at least 10-15 rows of realistic detailed data.
 3. Include Status columns (e.g., Status: Completed, Active, Pending, High, Medium, Low) and numeric metric columns to trigger automatic color-blended sheets, KPI cards, and charts!
 4. Format CSV with comma separation, proper quotes, and headers in the first row.`;
+}
 
-let chatHistory = [{ role: "system", content: SYSTEM_CONTENT }];
+let chatHistory = [{ role: "system", content: getSystemPrompt() }];
 
 // ─── INIT & LISTENERS ──────────────────────────────────────
 function init() {
@@ -1553,6 +1563,9 @@ function setCooldown(key) {
 }
 
 async function genText() {
+  const currentSysPrompt = getSystemPrompt();
+  chatHistory[0] = { role: "system", content: currentSysPrompt };
+
   // ── 1. OpenAI (user key) ──
   if (currentProvider === PROVIDERS.OPENAI) {
     if (!openaiKey) throw new Error("No OpenAI key set! Click Settings to add your key.");
@@ -1568,7 +1581,7 @@ async function genText() {
 
   const msgs = chatHistory.map(m => ({ role: m.role, content: m.content }));
   const lastMsg = chatHistory.filter(m => m.role === "user").slice(-1)[0]?.content || "";
-  const ctxPrompt = SYSTEM_CONTENT + "\n\nConversation:\n" +
+  const ctxPrompt = currentSysPrompt + "\n\nConversation:\n" +
     chatHistory.filter(m => m.role !== "system").slice(-8)
       .map(m => (m.role === "user" ? "Human: " : "Assistant: ") + m.content)
       .join("\n") + "\nAssistant:";
