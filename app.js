@@ -1440,6 +1440,11 @@ async function handleSubmit(e) {
   if (raw.toLowerCase().startsWith('/image ')) { mode = 'image'; prompt = raw.slice(7).trim(); }
   if (raw.toLowerCase().startsWith('/video ')) { mode = 'video'; prompt = raw.slice(7).trim(); }
 
+  // Auto-detect story mode intent if user asks to make/tell a story
+  if (mode === 'chat' && /(make|write|tell|generate|create)\s+.*?\b(story|movie|film|kahani|कहानी)\b/i.test(raw)) {
+    mode = 'story';
+  }
+
   addMsg(raw || '📎 Analyzing uploaded file(s)...', 'user');
   userInput.value = '';
 
@@ -2100,14 +2105,39 @@ function renderStoryMoviePlayer(storyData, prompt) {
 let globalStoryState = { card: null, isPlaying: false, timer: null, idx: 0 };
 
 function getStoryDataFromCard(card) {
+  // Ensure download bar exists on card
+  if (!card.querySelector(".ai-story-download-bar")) {
+    const dlBar = document.createElement("div");
+    dlBar.className = "ai-story-download-bar";
+    dlBar.innerHTML = `
+      <button class="ai-story-dl-btn dl-movie-btn" type="button">
+        <i class="fa-solid fa-file-video"></i> Download Movie (.mp4)
+      </button>
+      <button class="ai-story-dl-btn dl-image-btn" type="button">
+        <i class="fa-solid fa-download"></i> Save Scene Image
+      </button>
+    `;
+    card.appendChild(dlBar);
+  }
+
   if (card.dataset.storyJson) {
     try { return JSON.parse(card.dataset.storyJson); } catch (e) {}
   }
-  // Construct fallback from DOM
-  const title = card.querySelector(".ai-story-title span")?.textContent || "AI Story";
+
+  // Construct full multi-scene story for older saved cards missing dataset
+  const title = card.querySelector(".ai-story-title span")?.textContent || "AI Story Movie";
   const narration = card.querySelector(".ai-story-subtitles")?.textContent || "";
   const imgUrl = card.querySelector(".ai-story-img")?.src || "";
-  return { title, isHindi: /[\u0900-\u097F]/.test(narration), durLabel: "Movie", scenes: [{ sceneNumber: 1, narration, imageUrl: imgUrl }] };
+  const isHindi = /[\u0900-\u097F]/.test(narration) || /hindi|हिंदी/i.test(title);
+
+  const fallback = getFallbackStoryData(title, isHindi, 10, "1+ Min Movie");
+  if (imgUrl && fallback.scenes[0]) {
+    fallback.scenes[0].imageUrl = imgUrl;
+    if (narration) fallback.scenes[0].narration = narration;
+  }
+  
+  card.dataset.storyJson = JSON.stringify(fallback);
+  return fallback;
 }
 
 function toggleGlobalStoryPlay(card, playBtn) {
