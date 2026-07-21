@@ -2053,12 +2053,10 @@ function getFallbackStoryData(theme, isHindi, targetScenes, durLabel) {
 function renderStoryMoviePlayer(storyData, prompt) {
   const card = document.createElement("div");
   card.className = "ai-story-card";
+  card.dataset.storyJson = JSON.stringify(storyData);
+  card.dataset.currentIdx = "0";
 
   const totalScenes = storyData.scenes.length;
-  let currentSceneIdx = 0;
-  let isPlaying = false;
-  let speechTimer = null;
-
   const isHindi = storyData.isHindi || /[\u0900-\u097F]/.test(storyData.scenes[0].narration);
 
   card.innerHTML = `
@@ -2076,7 +2074,7 @@ function renderStoryMoviePlayer(storyData, prompt) {
     </div>
     
     <div class="ai-story-controls">
-      <button class="ai-story-play-btn">
+      <button class="ai-story-play-btn" type="button">
         <i class="fa-solid fa-play"></i> <span>Play Movie</span>
       </button>
       <div class="ai-story-progress-bar">
@@ -2086,119 +2084,172 @@ function renderStoryMoviePlayer(storyData, prompt) {
     </div>
 
     <div class="ai-story-download-bar">
-      <button class="ai-story-dl-btn dl-movie-btn">
+      <button class="ai-story-dl-btn dl-movie-btn" type="button">
         <i class="fa-solid fa-file-video"></i> Download Movie (.mp4)
       </button>
-      <button class="ai-story-dl-btn dl-image-btn">
+      <button class="ai-story-dl-btn dl-image-btn" type="button">
         <i class="fa-solid fa-download"></i> Save Scene Image
       </button>
     </div>
   `;
 
+  addMsg(card, "bot");
+}
+
+// ─── GLOBAL STORY PLAYER ENGINE (Delegated for Saved & New Cards) ──
+let globalStoryState = { card: null, isPlaying: false, timer: null, idx: 0 };
+
+function getStoryDataFromCard(card) {
+  if (card.dataset.storyJson) {
+    try { return JSON.parse(card.dataset.storyJson); } catch (e) {}
+  }
+  // Construct fallback from DOM
+  const title = card.querySelector(".ai-story-title span")?.textContent || "AI Story";
+  const narration = card.querySelector(".ai-story-subtitles")?.textContent || "";
+  const imgUrl = card.querySelector(".ai-story-img")?.src || "";
+  return { title, isHindi: /[\u0900-\u097F]/.test(narration), durLabel: "Movie", scenes: [{ sceneNumber: 1, narration, imageUrl: imgUrl }] };
+}
+
+function toggleGlobalStoryPlay(card, playBtn) {
+  const storyData = getStoryDataFromCard(card);
+  const totalScenes = storyData.scenes.length;
+
+  if (globalStoryState.card === card && globalStoryState.isPlaying) {
+    // Pause active movie
+    stopGlobalStoryPlayback();
+    playBtn.innerHTML = '<i class="fa-solid fa-play"></i> <span>Play Movie</span>';
+    return;
+  }
+
+  // Stop any other playing card
+  stopGlobalStoryPlayback();
+
+  globalStoryState.card = card;
+  globalStoryState.isPlaying = true;
+  playBtn.innerHTML = '<i class="fa-solid fa-pause"></i> <span>Pause</span>';
+
+  let startIdx = parseInt(card.dataset.currentIdx || "0");
+  if (startIdx >= totalScenes - 1) startIdx = 0;
+
+  playStoryScene(card, storyData, startIdx, playBtn);
+}
+
+function stopGlobalStoryPlayback() {
+  if (globalStoryState.timer) clearTimeout(globalStoryState.timer);
+  if ('speechSynthesis' in window) {
+    try { window.speechSynthesis.cancel(); } catch (e) {}
+  }
+  if (globalStoryState.card) {
+    const btn = globalStoryState.card.querySelector(".ai-story-play-btn");
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-play"></i> <span>Play Movie</span>';
+  }
+  globalStoryState.isPlaying = false;
+}
+
+function playStoryScene(card, storyData, idx, playBtn) {
+  if (!globalStoryState.isPlaying || globalStoryState.card !== card) return;
+
+  const total = storyData.scenes.length;
+  const scene = storyData.scenes[idx];
+  card.dataset.currentIdx = idx.toString();
+
   const imgEl = card.querySelector(".ai-story-img");
   const subEl = card.querySelector(".ai-story-subtitles");
-  const playBtn = card.querySelector(".ai-story-play-btn");
-  const progressFill = card.querySelector(".ai-story-progress-fill");
+  const fillEl = card.querySelector(".ai-story-progress-fill");
   const timeEl = card.querySelector(".ai-story-time");
-  const dlMovieBtn = card.querySelector(".dl-movie-btn");
-  const dlImageBtn = card.querySelector(".dl-image-btn");
 
-  function loadScene(idx) {
-    currentSceneIdx = idx;
-    const scene = storyData.scenes[idx];
+  if (imgEl && scene.imageUrl) {
     imgEl.style.opacity = "0.2";
     setTimeout(() => {
       imgEl.src = scene.imageUrl;
       imgEl.style.opacity = "1";
       imgEl.classList.toggle("zoom", idx % 2 === 1);
     }, 150);
-
-    subEl.textContent = scene.narration;
-    timeEl.textContent = `Scene ${idx + 1} / ${totalScenes} (${isHindi ? "हिंदी Voiceover" : "Audio Story"})`;
-    progressFill.style.width = `${((idx + 1) / totalScenes) * 100}%`;
   }
 
-  function speakNarration(text, onEnd) {
-    let finished = false;
-    const finish = () => {
-      if (!finished) {
-        finished = true;
-        if (speechTimer) clearTimeout(speechTimer);
-        if (isPlaying) onEnd();
-      }
-    };
+  if (subEl) subEl.textContent = scene.narration;
+  if (fillEl) fillEl.style.width = `${((idx + 1) / total) * 100}%`;
+  if (timeEl) timeEl.textContent = `Scene ${idx + 1} / ${total} (${storyData.isHindi ? "हिंदी Voiceover" : "Audio Story"})`;
 
-    // Calculate natural duration based on text length (4.5s to 7s)
-    const sceneDuration = Math.max(4500, Math.min(8000, text.length * 110));
-    speechTimer = setTimeout(finish, sceneDuration);
-
-    if ('speechSynthesis' in window) {
-      try {
-        window.speechSynthesis.cancel();
-        const ut = new SpeechSynthesisUtterance(text);
-        
-        if (isHindi || /[\u0900-\u097F]/.test(text)) {
-          ut.lang = 'hi-IN';
-          const voices = window.speechSynthesis.getVoices();
-          const hindiVoice = voices.find(v => v.lang.includes('hi') || v.name.toLowerCase().includes('hindi'));
-          if (hindiVoice) ut.voice = hindiVoice;
-          ut.rate = 0.95;
-        } else {
-          ut.rate = 0.95;
-          ut.pitch = 1.0;
-        }
-        
-        ut.onend = finish;
-        ut.onerror = finish;
-        window.speechSynthesis.speak(ut);
-      } catch (e) {
-        console.warn("SpeechSynthesis error fallback:", e);
+  let stepDone = false;
+  const advance = () => {
+    if (!stepDone) {
+      stepDone = true;
+      if (globalStoryState.timer) clearTimeout(globalStoryState.timer);
+      if (idx < total - 1) {
+        playStoryScene(card, storyData, idx + 1, playBtn);
+      } else {
+        stopGlobalStoryPlayback();
+        if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> <span>Replay Movie</span>';
+        card.dataset.currentIdx = "0";
       }
     }
-  }
+  };
 
-  function playNextScene() {
-    if (!isPlaying) return;
-    if (currentSceneIdx < totalScenes - 1) {
-      loadScene(currentSceneIdx + 1);
-      speakNarration(storyData.scenes[currentSceneIdx].narration, playNextScene);
-    } else {
-      isPlaying = false;
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-      playBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> <span>Replay Movie</span>';
+  // Fallback timer: 4.5s to 7.5s per scene
+  const durationMs = Math.max(4500, Math.min(8000, (scene.narration || "").length * 120));
+  globalStoryState.timer = setTimeout(advance, durationMs);
+
+  // Audio speech synthesis
+  if ('speechSynthesis' in window && scene.narration) {
+    try {
+      window.speechSynthesis.cancel();
+      const ut = new SpeechSynthesisUtterance(scene.narration);
+      if (storyData.isHindi || /[\u0900-\u097F]/.test(scene.narration)) {
+        ut.lang = 'hi-IN';
+        const voices = window.speechSynthesis.getVoices();
+        const hindiVoice = voices.find(v => v.lang.includes('hi') || v.name.toLowerCase().includes('hindi'));
+        if (hindiVoice) ut.voice = hindiVoice;
+        ut.rate = 0.95;
+      } else {
+        ut.rate = 0.95;
+      }
+      ut.onend = advance;
+      ut.onerror = advance;
+      window.speechSynthesis.speak(ut);
+    } catch (e) {
+      console.warn("TTS Error:", e);
     }
   }
-
-  playBtn.addEventListener("click", () => {
-    if (isPlaying) {
-      isPlaying = false;
-      if (speechTimer) clearTimeout(speechTimer);
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-      playBtn.innerHTML = '<i class="fa-solid fa-play"></i> <span>Play Movie</span>';
-    } else {
-      isPlaying = true;
-      playBtn.innerHTML = '<i class="fa-solid fa-pause"></i> <span>Pause</span>';
-      if (currentSceneIdx >= totalScenes - 1) loadScene(0);
-      else loadScene(currentSceneIdx);
-      speakNarration(storyData.scenes[currentSceneIdx].narration, playNextScene);
-    }
-  });
-
-  if (dlMovieBtn) dlMovieBtn.addEventListener("click", () => downloadStoryMovieVideo(storyData, dlMovieBtn));
-  
-  if (dlImageBtn) {
-    dlImageBtn.addEventListener("click", () => {
-      const scene = storyData.scenes[currentSceneIdx];
-      const a = document.createElement("a");
-      a.href = scene.imageUrl;
-      a.download = `quantumpulse-scene-${currentSceneIdx + 1}-${Date.now()}.jpg`;
-      a.target = "_blank";
-      a.click();
-    });
-  }
-
-  addMsg(card, "bot");
 }
+
+// Global Event Delegation for all cards (Saved & New)
+document.addEventListener("click", (e) => {
+  const playBtn = e.target.closest(".ai-story-play-btn");
+  if (playBtn) {
+    const card = playBtn.closest(".ai-story-card");
+    if (card) toggleGlobalStoryPlay(card, playBtn);
+    return;
+  }
+
+  const dlMovieBtn = e.target.closest(".dl-movie-btn");
+  if (dlMovieBtn) {
+    const card = dlMovieBtn.closest(".ai-story-card");
+    if (card) {
+      const storyData = getStoryDataFromCard(card);
+      downloadStoryMovieVideo(storyData, dlMovieBtn);
+    }
+    return;
+  }
+
+  const dlImgBtn = e.target.closest(".dl-image-btn");
+  if (dlImgBtn) {
+    const card = dlImgBtn.closest(".ai-story-card");
+    if (card) {
+      const storyData = getStoryDataFromCard(card);
+      const idx = parseInt(card.dataset.currentIdx || "0");
+      const scene = storyData.scenes[idx] || storyData.scenes[0];
+      if (scene && scene.imageUrl) {
+        const a = document.createElement("a");
+        a.href = scene.imageUrl;
+        a.download = `quantumpulse-scene-${idx + 1}-${Date.now()}.jpg`;
+        a.target = "_blank";
+        a.click();
+      }
+    }
+    return;
+  }
+});
 
 // ─── DOWNLOAD STORY MOVIE VIDEO EXPORTER ─────────────────
 async function downloadStoryMovieVideo(storyData, dlBtn) {
@@ -2220,7 +2271,6 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
         i.crossOrigin = "anonymous";
         i.onload = () => resolve(i);
         i.onerror = () => {
-          // Direct fallback if proxy delays
           const i2 = new Image();
           i2.crossOrigin = "anonymous";
           i2.onload = () => resolve(i2);
@@ -2271,7 +2321,6 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
         const offY = ((zoom - 1) * H) / 2;
         ctx.drawImage(item.img, -offX, -offY, W * zoom, H * zoom);
       } else {
-        // Fallback dark gradient canvas if image load was blocked
         const grad = ctx.createLinearGradient(0, 0, W, H);
         grad.addColorStop(0, "#0f0c21");
         grad.addColorStop(1, "#1a103c");
