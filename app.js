@@ -174,11 +174,6 @@ function setupAuth() {
   }
 
   updateAccountUI();
-
-  // Enforce mandatory sign-in on first visit for this device
-  if (!currentUser || !currentUser.username || currentUser.username === "Guest User") {
-    if (authModal) authModal.classList.add("active", "mandatory-auth");
-  }
 }
 
 function updateAccountUI() {
@@ -367,7 +362,6 @@ function setupListeners() {
   modeToggleBtn.addEventListener("click", () => {
     if (currentMode === 'chat')       currentMode = 'story';
     else if (currentMode === 'story') currentMode = 'image';
-    else if (currentMode === 'image') currentMode = 'video';
     else                              currentMode = 'chat';
     applyMode();
   });
@@ -1493,10 +1487,11 @@ function applyMode() {
     modeLabel.textContent = 'Image';
     modeToggleBtn.classList.add('image-mode');
     userInput.placeholder = 'Describe the image to generate...';
-  } else if (currentMode === 'video') {
-    modeIcon.className = 'fa-solid fa-film';
-    modeLabel.textContent = 'Video';
-    userInput.placeholder = 'Describe the video to generate... (e.g. a dog running on beach)';
+  } else if (currentMode === 'image') {
+    modeIcon.className = 'fa-solid fa-image';
+    modeLabel.textContent = 'Image';
+    modeToggleBtn.classList.add('image-mode');
+    userInput.placeholder = 'Describe the image to generate...';
   } else {
     modeIcon.className = 'fa-solid fa-message';
     modeLabel.textContent = 'Chat';
@@ -1516,7 +1511,6 @@ async function handleSubmit(e) {
   let prompt = raw;
   if (raw.toLowerCase().startsWith('/story ')) { mode = 'story'; prompt = raw.slice(7).trim(); }
   if (raw.toLowerCase().startsWith('/image ')) { mode = 'image'; prompt = raw.slice(7).trim(); }
-  if (raw.toLowerCase().startsWith('/video ')) { mode = 'video'; prompt = raw.slice(7).trim(); }
 
   // Auto-detect story mode intent if user asks to make/tell a story
   if (mode === 'chat' && /(make|write|tell|generate|create)\s+.*?\b(story|movie|film|kahani|कहानी)\b/i.test(raw)) {
@@ -1548,8 +1542,6 @@ async function handleSubmit(e) {
         } else if (entry.type === 'video') {
           renderVideo(entry.dataUrl, entry.file.name);
           typ.remove();
-          addMsg(`🎬 Video **${entry.file.name}** loaded! Ask me anything about it.`, 'bot');
-
         } else if (entry.extractedText) {
           const question = raw || `Analyze this ${entry.type.toUpperCase()} file and give me a clear summary.`;
           const contextMsg = `The user uploaded a ${entry.type.toUpperCase()} file named "${entry.file.name}". Content:\n\n${entry.extractedText.slice(0, 5000)}\n\nQuestion: ${question}`;
@@ -1598,16 +1590,7 @@ async function handleSubmit(e) {
       chatHistory.push({ role: 'user', content: 'Generate image: ' + prompt });
       chatHistory.push({ role: 'assistant', content: '[Image generated for: ' + prompt + ']' });
 
-    } else if (mode === 'video') {
-      if (!prompt) { typ.remove(); addMsg('Please describe the video you want to generate.', 'bot'); return; }
-      typ.querySelector('.msg-bubble').innerHTML =
-        '<div class="typing-dots"><span></span><span></span><span></span></div>' +
-        '<div class="video-progress-label">🎬 Generating video — this takes 30-90 seconds...</div>';
-      const videoUrl = await genVideo(prompt);
-      typ.remove();
-      renderVideo(videoUrl, prompt);
-      chatHistory.push({ role: 'user', content: 'Generate video: ' + prompt });
-      chatHistory.push({ role: 'assistant', content: '[Video generated for: ' + prompt + ']' });
+
 
     } else {
       chatHistory.push({ role: 'user', content: prompt });
@@ -1667,7 +1650,7 @@ async function genText() {
   const currentSysPrompt = getSystemPrompt();
   chatHistory[0] = { role: "system", content: currentSysPrompt };
 
-  // ── 1. OpenAI (user key) ──
+  // 1. OpenAI (user key)
   if (currentProvider === PROVIDERS.OPENAI) {
     if (!openaiKey) throw new Error("No OpenAI key set! Click Settings to add your key.");
     const r = await fetch(OPENAI_CHAT_ENDPOINT, {
@@ -1680,7 +1663,7 @@ async function genText() {
     return d.choices[0].message.content.trim();
   }
 
-  // ── High-Speed Free GPT-4o-mini Priority Fallback (CORS & Payload Safe) ──
+  // 2. High-Speed Free GPT-4o Priority Path (CORS & Payload Safe)
   try {
     const res = await fetch("https://text.pollinations.ai/", {
       method: "POST",
@@ -1701,93 +1684,17 @@ async function genText() {
     console.warn("Fast priority fallback failed:", e);
   }
 
-  const msgs = chatHistory.map(m => ({ role: m.role, content: m.content }));
+  // 3. Fast GET fallback
   const lastMsg = chatHistory.filter(m => m.role === "user").slice(-1)[0]?.content || "";
-  const ctxPrompt = currentSysPrompt + "\n\nConversation:\n" +
-    chatHistory.filter(m => m.role !== "system").slice(-8)
-      .map(m => (m.role === "user" ? "Human: " : "Assistant: ") + m.content)
-      .join("\n") + "\nAssistant:";
-
-  // ── 2. Puter GPT-4o ──
-  if (!isOnCooldown("puter-gpt4o") && typeof puter !== "undefined") {
-    try {
-      const resp = await puter.ai.chat(msgs, { model: "gpt-4o-mini" });
-      const t = typeof resp === "string" ? resp : resp?.message?.content || resp?.content || "";
-      if (t && t.trim().length > 3) return t.trim();
-    } catch (e) {
-      if (e.message?.includes("rate") || e.message?.includes("limit") || e.message?.includes("quota")) setCooldown("puter-gpt4o");
-      console.warn("Puter GPT-4o:", e.message);
+  try {
+    const res = await fetch("https://text.pollinations.ai/" + encodeURIComponent(lastMsg || "Hello"));
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.trim().length > 3) return text.trim();
     }
-  }
+  } catch (e) {}
 
-  // ── 3. Puter Claude ──
-  if (!isOnCooldown("puter-claude") && typeof puter !== "undefined") {
-    try {
-      const resp = await puter.ai.chat(msgs, { model: "claude-3-5-sonnet" });
-      const t = typeof resp === "string" ? resp : resp?.message?.content || resp?.content || "";
-      if (t && t.trim().length > 3) return t.trim();
-    } catch (e) {
-      if (e.message?.includes("rate") || e.message?.includes("limit") || e.message?.includes("quota")) setCooldown("puter-claude");
-      console.warn("Puter Claude:", e.message);
-    }
-  }
-
-  // ── 4. Pollinations gen.pollinations.ai (sk_ key) ──
-  if (!isOnCooldown("poll-gen")) {
-    const r = await tryFetch("https://gen.pollinations.ai/text/" + encodeURIComponent(ctxPrompt) + "?model=openai&key=" + POLLINATIONS_API_KEY);
-    if (r) return r; else setCooldown("poll-gen");
-  }
-
-  // ── 5. Pollinations POST ──
-  if (!isOnCooldown("poll-post")) {
-    const r = await tryPost("https://gen.pollinations.ai/v1/chat/completions?key=" + POLLINATIONS_API_KEY, { model: "openai", messages: chatHistory });
-    if (r) return r; else setCooldown("poll-post");
-  }
-
-  // ── 6. HuggingFace: Mistral-7B ──
-  if (!isOnCooldown("hf-mistral")) {
-    const r = await tryHF("mistralai/Mistral-7B-Instruct-v0.3", ctxPrompt);
-    if (r) return r; else setCooldown("hf-mistral");
-  }
-
-  // ── 7. HuggingFace: Llama 3.1 8B ──
-  if (!isOnCooldown("hf-llama")) {
-    const r = await tryHF("meta-llama/Llama-3.1-8B-Instruct", ctxPrompt);
-    if (r) return r; else setCooldown("hf-llama");
-  }
-
-  // ── 8. HuggingFace: Qwen 2.5 7B ──
-  if (!isOnCooldown("hf-qwen")) {
-    const r = await tryHF("Qwen/Qwen2.5-7B-Instruct", ctxPrompt);
-    if (r) return r; else setCooldown("hf-qwen");
-  }
-
-  // ── 9. HuggingFace: Zephyr 7B ──
-  if (!isOnCooldown("hf-zephyr")) {
-    const r = await tryHF("HuggingFaceH4/zephyr-7b-beta", ctxPrompt);
-    if (r) return r; else setCooldown("hf-zephyr");
-  }
-
-  // ── 10. HuggingFace: Phi-3 ──
-  if (!isOnCooldown("hf-phi")) {
-    const r = await tryHF("microsoft/Phi-3-mini-4k-instruct", ctxPrompt);
-    if (r) return r; else setCooldown("hf-phi");
-  }
-
-  // ── 11. HuggingFace: Gemma 2 ──
-  if (!isOnCooldown("hf-gemma")) {
-    const r = await tryHF("google/gemma-2-2b-it", ctxPrompt);
-    if (r) return r; else setCooldown("hf-gemma");
-  }
-
-  // ── 12. Pollinations text fallback ──
-  const legacyR = await tryFetch("https://text.pollinations.ai/" + encodeURIComponent(ctxPrompt));
-  if (legacyR) return legacyR;
-
-  const freeR = await tryFetch("https://text.pollinations.ai/" + encodeURIComponent(lastMsg || "Hello"));
-  if (freeR) return freeR;
-
-  // ── 13. Wikipedia last resort ──
+  // 4. Wikipedia summary fallback
   const wiki = await wikiSearch(lastMsg);
   if (wiki) return wiki;
 

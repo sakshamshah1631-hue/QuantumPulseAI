@@ -117,19 +117,6 @@
             <h2 id="current-chat-title">New Conversation</h2>
             <span class="creator-tag">by Saksham Sujas Shah</span>
           </div>
-
-          <!-- Top Header AI Model Selector Dropdown -->
-          <div class="header-model-pill" title="Select AI Model Architecture">
-            <i class="fa-solid fa-sparkles pill-icon"></i>
-            <select id="header-model-select" class="header-model-dropdown">
-              <option value="mixed" selected>⚡ Mixed (Recommended)</option>
-              <option value="pro">🧠 QuantumPulse Pro (Reasoning)</option>
-              <option value="vision">🎨 QuantumPulse Vision (Art)</option>
-              <option value="cinema">🎬 QuantumPulse Cinema (Movie)</option>
-              <option value="analyst">📊 QuantumPulse Analyst (Data)</option>
-              <option value="fast">⚡ QuantumPulse Fast (Ultra Speed)</option>
-            </select>
-          </div>
         </div>
 
         <div class="navbar-right">
@@ -184,28 +171,15 @@
           <div id="file-preview-area" class="file-preview-area" style="display:none;"></div>
 
           <form id="chat-form" class="chat-form">
-            <button type="button" id="mode-toggle-btn" class="mode-toggle-btn" title="Cycle: Chat → Story Mode → Image → Video">
+            <button type="button" id="mode-toggle-btn" class="mode-toggle-btn" title="Cycle: Chat → Story Mode → Image">
               <i class="fa-solid fa-message" id="mode-icon"></i>
               <span id="mode-label">Chat</span>
             </button>
 
-            <!-- Types of AI Models Column -->
-            <div class="model-select-wrapper" title="Select AI Model Architecture">
-              <i class="fa-solid fa-microchip model-select-icon"></i>
-              <select id="model-select" class="model-select-dropdown">
-                <option value="mixed" selected>⚡ Mixed (Recommended)</option>
-                <option value="pro">🧠 QuantumPulse Pro (Reasoning)</option>
-                <option value="vision">🎨 QuantumPulse Vision (Art)</option>
-                <option value="cinema">🎬 QuantumPulse Cinema (Movie)</option>
-                <option value="analyst">📊 QuantumPulse Analyst (Data)</option>
-                <option value="fast">⚡ QuantumPulse Fast (Ultra Speed)</option>
-              </select>
-            </div>
-
             <input type="file" id="file-input" multiple
-              accept="image/*,video/*,.pdf,.csv,.xls,.xlsx,.txt,.doc,.docx,.json,.md"
+              accept="image/*,.pdf,.csv,.xls,.xlsx,.txt,.doc,.docx,.json,.md"
               style="display:none;" />
-            <button type="button" id="upload-btn" class="upload-btn" title="Upload file (image, video, Excel, PDF, CSV, text)">
+            <button type="button" id="upload-btn" class="upload-btn" title="Upload file (image, Excel, PDF, CSV, text)">
               <i class="fa-solid fa-paperclip"></i>
             </button>
 
