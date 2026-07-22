@@ -2329,14 +2329,22 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
   dlBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing 35s AI Movie...';
 
   try {
+    const isHindi = storyData.isHindi || /[\u0900-\u097F]/.test(storyData.scenes[0].narration);
+    const lang = isHindi ? 'hi' : 'en';
+
+    // 1. Preload scene images & decode TTS spoken audio buffers
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContextClass();
+    const audioDest = audioCtx.createMediaStreamDestination();
+
     const totalSc = storyData.scenes.length;
     const sceneItems = [];
 
-    // 1. Parallel Image Preloading
     for (let i = 0; i < totalSc; i++) {
       const sc = storyData.scenes[i];
-      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Loading Scene ${i + 1}/${totalSc}...`;
+      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing Audio & Scene ${i + 1}/${totalSc}...`;
 
+      // Preload image
       const proxyUrl = "https://wsrv.nl/?url=" + encodeURIComponent(sc.imageUrl) + "&output=webp";
       const img = await new Promise(resolve => {
         const i1 = new Image();
@@ -2352,13 +2360,21 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
         i1.src = proxyUrl;
       });
 
-      sceneItems.push({ img, narration: sc.narration, sceneNum: i + 1 });
-    }
+      // Fetch & decode TTS Audio into AudioBuffer (feeds directly into MediaRecorder audioDest!)
+      let audioBuffer = null;
+      try {
+        const ttsRawUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(sc.narration.slice(0, 180))}&tl=${lang}&client=tw-ob`;
+        const res = await fetch("https://corsproxy.io/?" + encodeURIComponent(ttsRawUrl));
+        if (res.ok) {
+          const arrayBuf = await res.arrayBuffer();
+          audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
+        }
+      } catch (e) {
+        console.warn("TTS decode fallback:", e);
+      }
 
-    // 2. Web Audio API Ambient Soundtrack & Canvas Stream Destination
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContextClass();
-    const audioDest = audioCtx.createMediaStreamDestination();
+      sceneItems.push({ img, narration: sc.narration, audioBuffer, sceneNum: i + 1 });
+    }
 
     const W = 1280, H = 720;
     const canvas = document.createElement("canvas");
@@ -2387,48 +2403,36 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
 
     recorder.start(100);
 
-    // Ambient cinematic audio pad
-    function playCinematicAudioPad(duration) {
-      try {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(261.63, audioCtx.currentTime); // C4 note
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-        osc.connect(gain);
-        gain.connect(audioDest);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
-      } catch (e) {}
-    }
-
-    // 3. Render 3.5 seconds per scene for full movie duration (~35 seconds total)
+    // 3. Render each scene and play decoded spoken voice directly to audioDest
     const FPS = 30;
-    const SECONDS_PER_SCENE = 3.5;
-    const framesPerScene = Math.round(FPS * SECONDS_PER_SCENE);
-
-    playCinematicAudioPad(totalSc * SECONDS_PER_SCENE);
 
     for (let idx = 0; idx < sceneItems.length; idx++) {
       const item = sceneItems[idx];
-      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Recording Scene (${idx + 1}/${totalSc})...`;
+      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Recording Movie Scene (${idx + 1}/${totalSc})...`;
 
-      // Trigger Web Speech API voiceover during recording
-      if ('speechSynthesis' in window && item.narration) {
+      let sceneDuration = 3.5;
+
+      // Play decoded TTS audio buffer directly into MediaRecorder audioDest
+      if (item.audioBuffer) {
+        try {
+          const source = audioCtx.createBufferSource();
+          source.buffer = item.audioBuffer;
+          source.connect(audioDest);
+          source.connect(audioCtx.destination); // Also play through speakers!
+          source.start();
+          sceneDuration = Math.max(3.5, item.audioBuffer.duration);
+        } catch (e) {}
+      } else if ('speechSynthesis' in window && item.narration) {
+        // SpeechSynthesis fallback
         try {
           window.speechSynthesis.cancel();
           const ut = new SpeechSynthesisUtterance(item.narration);
-          if (storyData.isHindi || /[\u0900-\u097F]/.test(item.narration)) {
-            ut.lang = 'hi-IN';
-            const voices = window.speechSynthesis.getVoices();
-            const hindiVoice = voices.find(v => v.lang.includes('hi') || v.name.toLowerCase().includes('hindi'));
-            if (hindiVoice) ut.voice = hindiVoice;
-          }
-          ut.rate = 0.95;
+          if (lang === 'hi') ut.lang = 'hi-IN';
           window.speechSynthesis.speak(ut);
         } catch (e) {}
       }
+
+      const framesPerScene = Math.round(FPS * sceneDuration);
 
       for (let f = 0; f < framesPerScene; f++) {
         const progress = f / framesPerScene;
