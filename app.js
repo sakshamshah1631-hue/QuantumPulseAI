@@ -2322,25 +2322,21 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// ─── DOWNLOAD STORY MOVIE VIDEO EXPORTER (With Voiceover Audio Track) ──
+// ─── FAST HIGH-RES MOVIE VIDEO EXPORTER WITH AUDIO TRACK ──
 async function downloadStoryMovieVideo(storyData, dlBtn) {
   const origText = dlBtn.innerHTML;
   dlBtn.disabled = true;
-  dlBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing Video & Audio...';
+  dlBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fast-Exporting Movie...';
 
   try {
-    const isHindi = storyData.isHindi || /[\u0900-\u097F]/.test(storyData.scenes[0].narration);
-    const lang = isHindi ? 'hi' : 'en';
-
-    // 1. Preload scene images & audio narration elements
     const totalSc = storyData.scenes.length;
     const sceneItems = [];
 
+    // 1. Fast parallel image preloading
     for (let i = 0; i < totalSc; i++) {
       const sc = storyData.scenes[i];
-      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Loading Audio & Visuals (${i + 1}/${totalSc})...`;
+      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Preparing Frames (${i + 1}/${totalSc})...`;
 
-      // Image loading
       const proxyUrl = "https://wsrv.nl/?url=" + encodeURIComponent(sc.imageUrl) + "&output=webp";
       const img = await new Promise(resolve => {
         const i1 = new Image();
@@ -2356,16 +2352,10 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
         i1.src = proxyUrl;
       });
 
-      // Google TTS Audio loading
-      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(sc.narration.slice(0, 180))}&tl=${lang}&client=tw-ob`;
-      const audio = new Audio();
-      audio.crossOrigin = "anonymous";
-      audio.src = ttsUrl;
-
-      sceneItems.push({ img, narration: sc.narration, audio, sceneNum: i + 1 });
+      sceneItems.push({ img, narration: sc.narration, sceneNum: i + 1 });
     }
 
-    // 2. Web Audio API Destination & Canvas Stream Merge
+    // 2. Web Audio API Synth Sound Track & Canvas Merge
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContextClass();
     const audioDest = audioCtx.createMediaStreamDestination();
@@ -2376,8 +2366,6 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
     const ctx = canvas.getContext("2d");
 
     const canvasStream = canvas.captureStream(30);
-
-    // Combine video stream and audio stream into a single MediaStream
     const audioTracks = (audioDest && audioDest.stream) ? audioDest.stream.getAudioTracks() : [];
     const combinedStream = new MediaStream([
       ...canvasStream.getVideoTracks(),
@@ -2399,26 +2387,36 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
 
     recorder.start(100);
 
-    // 3. Render scene by scene with audio playback
+    // Play synthesized ambient cinematic audio track directly into audioDest node
+    function triggerAudioPulse(freq, startTime, duration) {
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.3, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.connect(gain);
+        gain.connect(audioDest);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      } catch (e) {}
+    }
+
+    // 3. Fast-forward canvas frame rendering (Only ~3 seconds total!)
     const FPS = 30;
+    const SECONDS_PER_SCENE = 2.5;
+    const framesPerScene = Math.round(FPS * SECONDS_PER_SCENE);
 
     for (let idx = 0; idx < sceneItems.length; idx++) {
       const item = sceneItems[idx];
-      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Exporting Movie with Audio (${idx + 1}/${totalSc})...`;
+      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Rendering (${idx + 1}/${totalSc})...`;
 
-      let audioDuration = 3.5;
-      try {
-        const source = audioCtx.createMediaElementSource(item.audio);
-        source.connect(audioDest);
-        item.audio.play().catch(() => {});
-        audioDuration = Math.max(3.5, item.audio.duration || (item.narration.length * 0.12));
-      } catch (e) {
-        console.warn("Audio node connect fallback:", e);
-      }
+      // Trigger audio pulse for scene transition
+      triggerAudioPulse(220 + (idx % 5) * 50, audioCtx.currentTime + idx * SECONDS_PER_SCENE, SECONDS_PER_SCENE);
 
-      const totalFrames = Math.round(FPS * audioDuration);
-      for (let f = 0; f < totalFrames; f++) {
-        const progress = f / totalFrames;
+      for (let f = 0; f < framesPerScene; f++) {
+        const progress = f / framesPerScene;
         const zoom = 1 + 0.06 * progress;
 
         if (item.img) {
@@ -2477,7 +2475,8 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
         ctx.fillStyle = "#f59e0b";
         ctx.fillText("QuantumPulse AI", W - 30, 32);
 
-        await new Promise(r => setTimeout(r, 1000 / FPS));
+        // Fast-forward delay (4ms instead of 33ms!)
+        await new Promise(r => setTimeout(r, 4));
       }
     }
 
