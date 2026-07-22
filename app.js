@@ -2381,16 +2381,38 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
 
+    // Select exact supported mimeType & matching extension for Windows Media Player compatibility
+    let mimeType = "video/webm";
+    let fileExt = ".webm";
+
+    if (MediaRecorder.isTypeSupported("video/mp4;codecs=avc1,mp4a.40.2")) {
+      mimeType = "video/mp4;codecs=avc1,mp4a.40.2";
+      fileExt = ".mp4";
+    } else if (MediaRecorder.isTypeSupported("video/mp4")) {
+      mimeType = "video/mp4";
+      fileExt = ".mp4";
+    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) {
+      mimeType = "video/webm;codecs=vp8,opus";
+      fileExt = ".webm";
+    } else if (MediaRecorder.isTypeSupported("video/webm")) {
+      mimeType = "video/webm";
+      fileExt = ".webm";
+    }
+
+    // Continuous audio presence from Frame 0 to prevent 0xc10100be header corruption
+    const silentOsc = audioCtx.createOscillator();
+    const silentGain = audioCtx.createGain();
+    silentGain.gain.value = 0.001;
+    silentOsc.connect(silentGain);
+    silentGain.connect(audioDest);
+    silentOsc.start();
+
     const canvasStream = canvas.captureStream(30);
     const audioTracks = (audioDest && audioDest.stream) ? audioDest.stream.getAudioTracks() : [];
     const combinedStream = new MediaStream([
       ...canvasStream.getVideoTracks(),
       ...audioTracks
     ]);
-
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-      ? "video/webm;codecs=vp9,opus"
-      : MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4";
 
     const recorder = new MediaRecorder(combinedStream, {
       mimeType,
@@ -2501,13 +2523,14 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
 
     recorder.stop();
     recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: mimeType });
+      try { silentOsc.stop(); } catch(e) {}
+      const rawType = mimeType.split(";")[0];
+      const blob = new Blob(chunks, { type: rawType });
       const url = URL.createObjectURL(blob);
-      const ext = mimeType.includes("webm") ? ".webm" : ".mp4";
       
       const a = document.createElement("a");
       a.href = url;
-      a.download = `quantumpulse-ai-story-${Date.now()}${ext}`;
+      a.download = `quantumpulse-ai-story-${Date.now()}${fileExt}`;
       a.click();
 
       dlBtn.disabled = false;
