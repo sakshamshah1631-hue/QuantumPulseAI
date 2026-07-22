@@ -112,6 +112,9 @@
         </div>
 
         <div class="navbar-right">
+          <button id="theme-toggle-btn" class="icon-btn" title="Toggle Light/Dark Theme">
+            <i class="fa-solid fa-moon"></i>
+          </button>
           <button id="clear-btn" class="icon-btn" title="Clear Messages">
             <i class="fa-solid fa-trash-can"></i>
           </button>
@@ -189,31 +192,40 @@
     </main>
   </div>
 
-  <!-- ── AUTHENTICATION MODAL (Account & Device Sync) ── -->
-  <div id="auth-modal" class="modal-backdrop">
-    <div class="modal-card auth-card">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-user-shield"></i> Account & Sync</h3>
-        <button id="close-auth-modal" class="close-btn">&times;</button>
+  <!-- ── MANDATORY SIGN-IN MODAL (Google Style 1-Click Account Setup) ── -->
+  <div id="auth-modal" class="modal-backdrop mandatory-auth">
+    <div class="modal-card auth-card google-style-card">
+      <div class="modal-header center-header">
+        <div class="brand-badge-icon"><i class="fa-solid fa-sparkles" style="color:#1a73e8;"></i></div>
+        <h3>Welcome to QuantumPulse AI</h3>
+        <p class="subtitle">Please sign in to continue on this device</p>
       </div>
       <div class="modal-body">
-        <div class="auth-hero">
-          <div class="auth-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-          <h4>Sign In to Sync Across Devices</h4>
-          <p>Login to save your conversations, access them from any device, and keep your history safe!</p>
+        <!-- 1-Click Google Style "Continue as..." Card -->
+        <div id="google-continue-card" class="google-continue-card">
+          <div class="g-avatar"><i class="fa-brands fa-google" style="color:#4285f4; font-size:1.4rem;"></i></div>
+          <div class="g-info">
+            <span class="g-title">Continue with Google Account</span>
+            <span class="g-sub">Instant 1-Click Access &bull; No Verification Needed</span>
+          </div>
+          <button id="google-login-btn" class="g-action-btn">
+            Continue as User <i class="fa-solid fa-chevron-right"></i>
+          </button>
         </div>
 
-        <!-- Quick Username Login -->
+        <div class="divider"><span>OR CUSTOM ACCOUNT</span></div>
+
+        <!-- Custom Username / Email Login -->
         <div class="setting-group">
-          <label class="setting-label">Choose your Username</label>
+          <label class="setting-label">Enter your Name or Email</label>
           <div class="input-with-icon">
             <i class="fa-solid fa-user input-icon"></i>
-            <input type="text" id="username-input" placeholder="Enter username (e.g. SakshamShah)" autocomplete="username" />
+            <input type="text" id="username-input" placeholder="e.g. Saksham Shah (saksham@gmail.com)" autocomplete="name" />
           </div>
         </div>
 
         <button id="local-login-btn" class="primary-btn full-width">
-          <i class="fa-solid fa-arrow-right-to-bracket"></i> Continue as User
+          <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In & Start Chatting
         </button>
       </div>
     </div>

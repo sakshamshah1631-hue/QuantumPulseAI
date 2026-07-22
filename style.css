@@ -1,31 +1,62 @@
 /* style.css - QuantumPulse AI Gemini-Style Wide UI */
 
 :root {
-  /* Deep Space Gradient */
-  --bg-gradient: radial-gradient(circle at 50% 0%, #170b36 0%, #090714 40%, #030207 100%);
-  --accent-cyan: #00e5ff;
-  --accent-purple: #9333ea;
-  --accent-pink: #ec4899;
+  /* ☀️ Light Mode (Gemini Professional Clean White & Black) */
+  --bg-gradient: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  --app-bg: #ffffff;
+  --sidebar-bg: #f0f4f9;
+  --panel-bg: #ffffff;
+  --panel-border: #e1e7ef;
+  --panel-hover: #e2e8f0;
   
-  /* Advanced Glassmorphism */
-  --panel-bg: rgba(14, 11, 28, 0.85);
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --panel-hover: rgba(255, 255, 255, 0.12);
+  --accent-blue: #1a73e8;
+  --accent-purple: #8e24aa;
+  --accent-cyan: #00838f;
   
-  /* Typography */
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
+  --text-main: #1f1f1f;
+  --text-muted: #5f6368;
+
+  --user-msg-bg: linear-gradient(135deg, #1a73e8, #4285f4);
+  --user-msg-text: #ffffff;
+  --bot-msg-bg: #f0f4f9;
+  --bot-msg-border: #dbe0e6;
+  --bot-msg-text: #1f1f1f;
   
-  /* Chat Bubbles */
-  --user-msg-bg: linear-gradient(135deg, #7c3aed, #4f46e5);
-  --bot-msg-bg: rgba(20, 16, 36, 0.9);
-  --bot-msg-border: rgba(147, 51, 234, 0.25);
+  --input-bg: #e9eef6;
+  --input-border: #d0d7de;
+  --input-text: #1f1f1f;
   
-  /* Geometry */
   --radius-lg: 24px;
   --radius-md: 16px;
   --radius-sm: 8px;
   --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+[data-theme="dark"], body.dark-mode {
+  /* 🌙 Dark Mode (Gemini Sleek Deep Space Dark) */
+  --bg-gradient: radial-gradient(circle at 50% 0%, #170b36 0%, #090714 40%, #030207 100%);
+  --app-bg: #131314;
+  --sidebar-bg: #1e1e20;
+  --panel-bg: rgba(28, 28, 30, 0.95);
+  --panel-border: rgba(255, 255, 255, 0.1);
+  --panel-hover: rgba(255, 255, 255, 0.15);
+
+  --accent-blue: #4285f4;
+  --accent-purple: #a142f4;
+  --accent-cyan: #00e5ff;
+
+  --text-main: #e3e3e3;
+  --text-muted: #9aa0a6;
+
+  --user-msg-bg: linear-gradient(135deg, #7c3aed, #4f46e5);
+  --user-msg-text: #ffffff;
+  --bot-msg-bg: rgba(30, 30, 34, 0.95);
+  --bot-msg-border: rgba(255, 255, 255, 0.12);
+  --bot-msg-text: #e3e3e3;
+
+  --input-bg: #1e1e20;
+  --input-border: rgba(255, 255, 255, 0.15);
+  --input-text: #e3e3e3;
 }
 
 * {
@@ -43,6 +74,7 @@ body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* ── 2-COLUMN APP LAYOUT ─────────────────────────────────── */
@@ -1796,6 +1828,128 @@ body {
     max-height: 350px;
     -webkit-overflow-scrolling: touch;
   }
+}
+
+/* ─── GOOGLE STYLE MANDATORY AUTH MODAL ─────────────────── */
+.modal-backdrop.mandatory-auth {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999 !important;
+}
+
+.google-style-card {
+  max-width: 440px;
+  width: 90%;
+  background: var(--app-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 28px;
+  padding: 2.2rem 1.8rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  text-align: center;
+  color: var(--text-main);
+  animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.center-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.brand-badge-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(26, 115, 232, 0.15), rgba(142, 36, 170, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.google-style-card h3 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.google-style-card .subtitle {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.google-continue-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  padding: 1rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-align: left;
+  margin-bottom: 1.2rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.google-continue-card:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 6px 20px rgba(66, 133, 244, 0.15);
+}
+
+.g-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(66, 133, 244, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.g-info {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.g-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.g-sub {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.g-action-btn {
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background 0.2s ease;
+}
+
+.g-action-btn:hover {
+  background: #1557b0;
+}
 
   .qp-sp-table th, 
   .qp-sp-table td {
@@ -1817,7 +1971,6 @@ body {
   .ai-image-card {
     max-width: 100%;
   }
-}
 
 @media (max-width: 480px) {
   .welcome-hero h1 {

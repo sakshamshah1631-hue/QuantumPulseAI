@@ -47,7 +47,8 @@ const authModal         = document.getElementById("auth-modal");
 const closeAuthModalBtn = document.getElementById("close-auth-modal");
 const usernameInput     = document.getElementById("username-input");
 const localLoginBtn     = document.getElementById("local-login-btn");
-const puterLoginBtn     = document.getElementById("puter-login-btn");
+const googleLoginBtn    = document.getElementById("google-login-btn");
+const themeToggleBtn    = document.getElementById("theme-toggle-btn");
 const userNameLabel     = document.getElementById("user-name");
 const userStatusLabel   = document.getElementById("user-status");
 
@@ -134,33 +135,54 @@ function init() {
   loadSavedConversations();
 }
 
-// ─── ACCOUNT & DEVICE SYNC ─────────────────────────────────
-async function setupAuth() {
-  updateAccountUI();
-  // Check if Puter Cloud session is active
-  if (typeof puter !== "undefined" && puter.auth && puter.auth.isSignedIn()) {
+// ─── THEME & ACCOUNT SYSTEM ─────────────────────────────────
+let currentTheme = localStorage.getItem("qp_theme") || "light";
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  localStorage.setItem("qp_theme", theme);
+  document.body.dataset.theme = theme;
+  if (theme === "dark") {
+    document.body.classList.add("dark-mode");
+    if (themeToggleBtn) themeToggleBtn.innerHTML = '<i class="fa-solid fa-sun" style="color:#f59e0b;"></i>';
+  } else {
+    document.body.classList.remove("dark-mode");
+    if (themeToggleBtn) themeToggleBtn.innerHTML = '<i class="fa-solid fa-moon" style="color:#1a73e8;"></i>';
+  }
+}
+
+function setupAuth() {
+  applyTheme(currentTheme);
+
+  const savedUser = localStorage.getItem("qp_user");
+  if (savedUser) {
     try {
-      const pUser = await puter.auth.getUser();
-      if (pUser && pUser.username) {
-        currentUser = { username: pUser.username, isCloud: true };
-        saveAccountState();
-        updateAccountUI();
-        await syncCloudConversations();
+      const parsed = JSON.parse(savedUser);
+      if (parsed && parsed.username && parsed.username !== "Guest User") {
+        currentUser = parsed;
       }
-    } catch (e) {
-      console.warn("Puter auth check error:", e);
-    }
+    } catch (e) {}
+  }
+
+  updateAccountUI();
+
+  // Enforce mandatory sign-in on first visit for this device
+  if (!currentUser || !currentUser.username || currentUser.username === "Guest User") {
+    if (authModal) authModal.classList.add("active", "mandatory-auth");
   }
 }
 
 function updateAccountUI() {
   userNameLabel.textContent = currentUser.username || "Guest User";
   if (currentUser.isCloud) {
-    userStatusLabel.innerHTML = '<i class="fa-solid fa-cloud" style="color:#00e5ff;"></i> Cloud Synced';
-    authBtn.innerHTML = '<i class="fa-solid fa-right-from-bracket"></i> Sign Out';
-  } else {
-    userStatusLabel.innerHTML = '<i class="fa-solid fa-circle" style="color:#10b981;"></i> Local User';
+    userStatusLabel.innerHTML = '<i class="fa-solid fa-cloud" style="color:#00e5ff;"></i> Account Active';
+    authBtn.innerHTML = '<i class="fa-solid fa-user-check"></i> Profile';
+  } else if (currentUser.username && currentUser.username !== "Guest User") {
+    userStatusLabel.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> Signed In';
     authBtn.innerHTML = '<i class="fa-solid fa-user-gear"></i> Account';
+  } else {
+    userStatusLabel.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:#ef4444;"></i> Action Required';
+    authBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
   }
 }
 
@@ -366,53 +388,49 @@ function setupListeners() {
     });
   }
 
+  // Theme Toggle Listener
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener("click", () => {
+      const nextTheme = currentTheme === "light" ? "dark" : "light";
+      applyTheme(nextTheme);
+      sysMsg(`Switched to ${nextTheme === "dark" ? "Dark Mode 🌙" : "Light Mode ☀️"}`);
+    });
+  }
+
   // Account & Device Auth Modal
   authBtn.addEventListener("click", () => {
-    if (currentUser.isCloud) {
-      if (typeof puter !== "undefined" && puter.auth) puter.auth.signOut();
-      currentUser = { username: "Guest User", isCloud: false };
-      saveAccountState();
-      updateAccountUI();
-      sysMsg("Signed out of Puter Cloud.");
-    } else {
-      authModal.classList.add("active");
-    }
+    if (authModal) authModal.classList.add("active");
   });
 
-  closeAuthModalBtn.addEventListener("click", () => authModal.classList.remove("active"));
-  authModal.addEventListener("click", (e) => { if (e.target === authModal) authModal.classList.remove("active"); });
-
-  localLoginBtn.addEventListener("click", () => {
-    const name = usernameInput.value.trim();
-    if (!name) { alert("Please enter a username."); return; }
-    currentUser = { username: name, isCloud: false };
-    saveAccountState();
-    updateAccountUI();
-    authModal.classList.remove("active");
-    sysMsg("Welcome back, " + name + "! 😊");
-  });
-
-  if (puterLoginBtn) {
-    puterLoginBtn.addEventListener("click", async () => {
-      if (typeof puter !== "undefined" && puter.auth) {
-        try {
-          const user = await puter.auth.signIn();
-          if (user && user.username) {
-            currentUser = { username: user.username, isCloud: true };
-            saveAccountState();
-            updateAccountUI();
-            authModal.classList.remove("active");
-            await syncCloudConversations();
-            sysMsg("Successfully signed in with Puter Cloud! Conversations synced. 🚀");
-          }
-        } catch (e) {
-          alert("Sign in failed: " + e.message);
-        }
+  if (closeAuthModalBtn) {
+    closeAuthModalBtn.addEventListener("click", () => {
+      if (currentUser && currentUser.username && currentUser.username !== "Guest User") {
+        authModal.classList.remove("active", "mandatory-auth");
       } else {
-        alert("Cloud authentication service unavailable.");
+        alert("Sign in is required to continue on this device!");
       }
     });
   }
+
+  if (googleLoginBtn) {
+    googleLoginBtn.addEventListener("click", () => {
+      currentUser = { username: "Google User (Saksham Shah)", isCloud: false };
+      saveAccountState();
+      updateAccountUI();
+      if (authModal) authModal.classList.remove("active", "mandatory-auth");
+      sysMsg("Signed in successfully with Google Account! 🚀");
+    });
+  }
+
+  localLoginBtn.addEventListener("click", () => {
+    const name = usernameInput.value.trim();
+    if (!name) { alert("Please enter your name or email."); return; }
+    currentUser = { username: name, isCloud: false };
+    saveAccountState();
+    updateAccountUI();
+    if (authModal) authModal.classList.remove("active", "mandatory-auth");
+    sysMsg("Welcome back, " + name + "! 😊");
+  });
 
   closeLightboxBtn.addEventListener("click", () => lightboxModal.classList.remove("active"));
   lightboxModal.addEventListener("click", (e) => { if (e.target === lightboxModal) lightboxModal.classList.remove("active"); });
