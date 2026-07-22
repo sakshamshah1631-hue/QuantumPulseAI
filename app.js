@@ -1680,6 +1680,27 @@ async function genText() {
     return d.choices[0].message.content.trim();
   }
 
+  // ── High-Speed Free GPT-4o-mini Priority Fallback (CORS & Payload Safe) ──
+  try {
+    const res = await fetch("https://text.pollinations.ai/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: chatHistory,
+        model: "openai",
+        jsonMode: false
+      })
+    });
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.trim().length > 3) {
+        return text.trim();
+      }
+    }
+  } catch (e) {
+    console.warn("Fast priority fallback failed:", e);
+  }
+
   const msgs = chatHistory.map(m => ({ role: m.role, content: m.content }));
   const lastMsg = chatHistory.filter(m => m.role === "user").slice(-1)[0]?.content || "";
   const ctxPrompt = currentSysPrompt + "\n\nConversation:\n" +
