@@ -49,8 +49,10 @@ const usernameInput     = document.getElementById("username-input");
 const localLoginBtn     = document.getElementById("local-login-btn");
 const googleLoginBtn    = document.getElementById("google-login-btn");
 const themeToggleBtn    = document.getElementById("theme-toggle-btn");
+const sidebarThemeBtn   = document.getElementById("sidebar-theme-btn");
 const logoutBtn         = document.getElementById("logout-btn");
 const modalLogoutBtn    = document.getElementById("modal-logout-btn");
+const sidebarLogoutBtn  = document.getElementById("sidebar-logout-btn");
 const modelSelect       = document.getElementById("model-select");
 const headerModelSelect = document.getElementById("header-model-select");
 const userNameLabel     = document.getElementById("user-name");
@@ -150,9 +152,11 @@ function applyTheme(theme) {
   if (theme === "dark") {
     document.body.classList.add("dark-mode");
     if (themeToggleBtn) themeToggleBtn.innerHTML = '<i class="fa-solid fa-sun" style="color:#f59e0b;"></i>';
+    if (sidebarThemeBtn) sidebarThemeBtn.innerHTML = '<i class="fa-solid fa-sun" style="color:#f59e0b;"></i> Light';
   } else {
     document.body.classList.remove("dark-mode");
     if (themeToggleBtn) themeToggleBtn.innerHTML = '<i class="fa-solid fa-moon" style="color:#1a73e8;"></i>';
+    if (sidebarThemeBtn) sidebarThemeBtn.innerHTML = '<i class="fa-solid fa-moon" style="color:#1a73e8;"></i> Dark';
   }
 }
 
@@ -411,6 +415,18 @@ function setupListeners() {
       applyTheme(nextTheme);
       sysMsg(`Switched to ${nextTheme === "dark" ? "Dark Mode 🌙" : "Light Mode ☀️"}`);
     });
+  }
+
+  if (sidebarThemeBtn) {
+    sidebarThemeBtn.addEventListener("click", () => {
+      const nextTheme = currentTheme === "light" ? "dark" : "light";
+      applyTheme(nextTheme);
+      sysMsg(`Switched to ${nextTheme === "dark" ? "Dark Mode 🌙" : "Light Mode ☀️"}`);
+    });
+  }
+
+  if (sidebarLogoutBtn) {
+    sidebarLogoutBtn.addEventListener("click", () => handleSignOut());
   }
 
   // Account & Device Auth Modal
