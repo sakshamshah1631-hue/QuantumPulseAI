@@ -52,6 +52,7 @@ const themeToggleBtn    = document.getElementById("theme-toggle-btn");
 const logoutBtn         = document.getElementById("logout-btn");
 const modalLogoutBtn    = document.getElementById("modal-logout-btn");
 const modelSelect       = document.getElementById("model-select");
+const headerModelSelect = document.getElementById("header-model-select");
 const userNameLabel     = document.getElementById("user-name");
 const userStatusLabel   = document.getElementById("user-status");
 
@@ -455,20 +456,23 @@ function setupListeners() {
     modalLogoutBtn.addEventListener("click", () => handleSignOut());
   }
 
-  if (modelSelect) {
-    modelSelect.addEventListener("change", (e) => {
-      selectedAIModel = e.target.value;
-      const modelNames = {
-        mixed: "Mixed (Recommended) ⚡",
-        pro: "QuantumPulse Pro (Reasoning) 🧠",
-        vision: "QuantumPulse Vision (Art) 🎨",
-        cinema: "QuantumPulse Cinema (Movie) 🎬",
-        analyst: "QuantumPulse Analyst (Data) 📊",
-        fast: "QuantumPulse Fast (Ultra Speed) ⚡"
-      };
-      sysMsg(`Switched AI Model to ${modelNames[selectedAIModel] || selectedAIModel}`);
-    });
+  function handleModelChange(val) {
+    selectedAIModel = val;
+    if (modelSelect) modelSelect.value = val;
+    if (headerModelSelect) headerModelSelect.value = val;
+    const modelNames = {
+      mixed: "Mixed (Recommended) ⚡",
+      pro: "QuantumPulse Pro (Reasoning) 🧠",
+      vision: "QuantumPulse Vision (Art) 🎨",
+      cinema: "QuantumPulse Cinema (Movie) 🎬",
+      analyst: "QuantumPulse Analyst (Data) 📊",
+      fast: "QuantumPulse Fast (Ultra Speed) ⚡"
+    };
+    sysMsg(`Switched AI Model to ${modelNames[selectedAIModel] || selectedAIModel}`);
   }
+
+  if (modelSelect) modelSelect.addEventListener("change", (e) => handleModelChange(e.target.value));
+  if (headerModelSelect) headerModelSelect.addEventListener("change", (e) => handleModelChange(e.target.value));
 
   closeLightboxBtn.addEventListener("click", () => lightboxModal.classList.remove("active"));
   lightboxModal.addEventListener("click", (e) => { if (e.target === lightboxModal) lightboxModal.classList.remove("active"); });
