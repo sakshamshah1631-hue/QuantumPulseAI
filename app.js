@@ -2322,20 +2322,20 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// ─── FAST HIGH-RES MOVIE VIDEO EXPORTER WITH AUDIO TRACK ──
+// ─── FULL DURATION AI MOVIE EXPORTER (With Voiceover & Ambient Soundtrack) ──
 async function downloadStoryMovieVideo(storyData, dlBtn) {
   const origText = dlBtn.innerHTML;
   dlBtn.disabled = true;
-  dlBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fast-Exporting Movie...';
+  dlBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing 35s AI Movie...';
 
   try {
     const totalSc = storyData.scenes.length;
     const sceneItems = [];
 
-    // 1. Fast parallel image preloading
+    // 1. Parallel Image Preloading
     for (let i = 0; i < totalSc; i++) {
       const sc = storyData.scenes[i];
-      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Preparing Frames (${i + 1}/${totalSc})...`;
+      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Loading Scene ${i + 1}/${totalSc}...`;
 
       const proxyUrl = "https://wsrv.nl/?url=" + encodeURIComponent(sc.imageUrl) + "&output=webp";
       const img = await new Promise(resolve => {
@@ -2355,7 +2355,7 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
       sceneItems.push({ img, narration: sc.narration, sceneNum: i + 1 });
     }
 
-    // 2. Web Audio API Synth Sound Track & Canvas Merge
+    // 2. Web Audio API Ambient Soundtrack & Canvas Stream Destination
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContextClass();
     const audioDest = audioCtx.createMediaStreamDestination();
@@ -2387,33 +2387,48 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
 
     recorder.start(100);
 
-    // Play synthesized ambient cinematic audio track directly into audioDest node
-    function triggerAudioPulse(freq, startTime, duration) {
+    // Ambient cinematic audio pad
+    function playCinematicAudioPad(duration) {
       try {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0.3, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.frequency.setValueAtTime(261.63, audioCtx.currentTime); // C4 note
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + duration);
         osc.connect(gain);
         gain.connect(audioDest);
-        osc.start(startTime);
-        osc.stop(startTime + duration);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
       } catch (e) {}
     }
 
-    // 3. Fast-forward canvas frame rendering (Only ~3 seconds total!)
+    // 3. Render 3.5 seconds per scene for full movie duration (~35 seconds total)
     const FPS = 30;
-    const SECONDS_PER_SCENE = 2.5;
+    const SECONDS_PER_SCENE = 3.5;
     const framesPerScene = Math.round(FPS * SECONDS_PER_SCENE);
+
+    playCinematicAudioPad(totalSc * SECONDS_PER_SCENE);
 
     for (let idx = 0; idx < sceneItems.length; idx++) {
       const item = sceneItems[idx];
-      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Rendering (${idx + 1}/${totalSc})...`;
+      dlBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Recording Scene (${idx + 1}/${totalSc})...`;
 
-      // Trigger audio pulse for scene transition
-      triggerAudioPulse(220 + (idx % 5) * 50, audioCtx.currentTime + idx * SECONDS_PER_SCENE, SECONDS_PER_SCENE);
+      // Trigger Web Speech API voiceover during recording
+      if ('speechSynthesis' in window && item.narration) {
+        try {
+          window.speechSynthesis.cancel();
+          const ut = new SpeechSynthesisUtterance(item.narration);
+          if (storyData.isHindi || /[\u0900-\u097F]/.test(item.narration)) {
+            ut.lang = 'hi-IN';
+            const voices = window.speechSynthesis.getVoices();
+            const hindiVoice = voices.find(v => v.lang.includes('hi') || v.name.toLowerCase().includes('hindi'));
+            if (hindiVoice) ut.voice = hindiVoice;
+          }
+          ut.rate = 0.95;
+          window.speechSynthesis.speak(ut);
+        } catch (e) {}
+      }
 
       for (let f = 0; f < framesPerScene; f++) {
         const progress = f / framesPerScene;
@@ -2475,8 +2490,8 @@ async function downloadStoryMovieVideo(storyData, dlBtn) {
         ctx.fillStyle = "#f59e0b";
         ctx.fillText("QuantumPulse AI", W - 30, 32);
 
-        // Fast-forward delay (4ms instead of 33ms!)
-        await new Promise(r => setTimeout(r, 4));
+        // Real-time 30 FPS pacing so video is full 35s duration
+        await new Promise(r => setTimeout(r, 1000 / FPS));
       }
     }
 
