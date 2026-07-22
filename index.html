@@ -168,6 +168,19 @@
               <span id="mode-label">Chat</span>
             </button>
 
+            <!-- Types of AI Models Column -->
+            <div class="model-select-wrapper" title="Select AI Model Architecture">
+              <i class="fa-solid fa-microchip model-select-icon"></i>
+              <select id="model-select" class="model-select-dropdown">
+                <option value="mixed" selected>⚡ Mixed (Recommended)</option>
+                <option value="pro">🧠 QuantumPulse Pro (Reasoning)</option>
+                <option value="vision">🎨 QuantumPulse Vision (Art)</option>
+                <option value="cinema">🎬 QuantumPulse Cinema (Movie)</option>
+                <option value="analyst">📊 QuantumPulse Analyst (Data)</option>
+                <option value="fast">⚡ QuantumPulse Fast (Ultra Speed)</option>
+              </select>
+            </div>
+
             <input type="file" id="file-input" multiple
               accept="image/*,video/*,.pdf,.csv,.xls,.xlsx,.txt,.doc,.docx,.json,.md"
               style="display:none;" />

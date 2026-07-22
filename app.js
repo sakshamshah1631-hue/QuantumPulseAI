@@ -51,11 +51,13 @@ const googleLoginBtn    = document.getElementById("google-login-btn");
 const themeToggleBtn    = document.getElementById("theme-toggle-btn");
 const logoutBtn         = document.getElementById("logout-btn");
 const modalLogoutBtn    = document.getElementById("modal-logout-btn");
+const modelSelect       = document.getElementById("model-select");
 const userNameLabel     = document.getElementById("user-name");
 const userStatusLabel   = document.getElementById("user-status");
 
 // ─── STATE & EXPRESSIVE SYSTEM PROMPT ──────────────────────
 let currentMode     = 'chat'; // 'chat' | 'image' | 'video'
+let selectedAIModel = 'mixed'; // 'mixed' (Recommended) | 'pro' | 'vision' | 'cinema' | 'analyst' | 'fast'
 let currentProvider = getSavedProvider();
 let openaiKey       = getSavedOpenAIKey();
 let pendingFiles    = [];
@@ -451,6 +453,21 @@ function setupListeners() {
 
   if (modalLogoutBtn) {
     modalLogoutBtn.addEventListener("click", () => handleSignOut());
+  }
+
+  if (modelSelect) {
+    modelSelect.addEventListener("change", (e) => {
+      selectedAIModel = e.target.value;
+      const modelNames = {
+        mixed: "Mixed (Recommended) ⚡",
+        pro: "QuantumPulse Pro (Reasoning) 🧠",
+        vision: "QuantumPulse Vision (Art) 🎨",
+        cinema: "QuantumPulse Cinema (Movie) 🎬",
+        analyst: "QuantumPulse Analyst (Data) 📊",
+        fast: "QuantumPulse Fast (Ultra Speed) ⚡"
+      };
+      sysMsg(`Switched AI Model to ${modelNames[selectedAIModel] || selectedAIModel}`);
+    });
   }
 
   closeLightboxBtn.addEventListener("click", () => lightboxModal.classList.remove("active"));

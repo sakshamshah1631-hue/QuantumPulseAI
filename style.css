@@ -713,6 +713,49 @@ body {
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* AI Model Selector Column (Gemini Style Dropdown) */
+.model-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  padding: 0.35rem 0.65rem;
+  border-radius: 20px;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.model-select-wrapper:hover {
+  background: var(--panel-hover);
+  border-color: var(--accent-blue);
+}
+
+.model-select-icon {
+  color: var(--accent-cyan);
+  font-size: 0.85rem;
+}
+
+.model-select-dropdown {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding-right: 0.2rem;
+}
+
+.model-select-dropdown option {
+  background: var(--sidebar-bg);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  padding: 0.5rem;
+}
+
 .mode-toggle-btn.story-mode {
   background: linear-gradient(135deg, #f59e0b, #ec4899);
   color: #fff;
