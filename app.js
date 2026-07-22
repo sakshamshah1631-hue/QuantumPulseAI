@@ -392,25 +392,27 @@ function setupListeners() {
     sysMsg("Welcome back, " + name + "! 😊");
   });
 
-  puterLoginBtn.addEventListener("click", async () => {
-    if (typeof puter !== "undefined" && puter.auth) {
-      try {
-        const user = await puter.auth.signIn();
-        if (user && user.username) {
-          currentUser = { username: user.username, isCloud: true };
-          saveAccountState();
-          updateAccountUI();
-          authModal.classList.remove("active");
-          await syncCloudConversations();
-          sysMsg("Successfully signed in with Puter Cloud! Conversations synced. 🚀");
+  if (puterLoginBtn) {
+    puterLoginBtn.addEventListener("click", async () => {
+      if (typeof puter !== "undefined" && puter.auth) {
+        try {
+          const user = await puter.auth.signIn();
+          if (user && user.username) {
+            currentUser = { username: user.username, isCloud: true };
+            saveAccountState();
+            updateAccountUI();
+            authModal.classList.remove("active");
+            await syncCloudConversations();
+            sysMsg("Successfully signed in with Puter Cloud! Conversations synced. 🚀");
+          }
+        } catch (e) {
+          alert("Sign in failed: " + e.message);
         }
-      } catch (e) {
-        alert("Sign in failed: " + e.message);
+      } else {
+        alert("Cloud authentication service unavailable.");
       }
-    } else {
-      alert("Cloud authentication service unavailable.");
-    }
-  });
+    });
+  }
 
   closeLightboxBtn.addEventListener("click", () => lightboxModal.classList.remove("active"));
   lightboxModal.addEventListener("click", (e) => { if (e.target === lightboxModal) lightboxModal.classList.remove("active"); });
