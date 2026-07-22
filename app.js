@@ -49,6 +49,8 @@ const usernameInput     = document.getElementById("username-input");
 const localLoginBtn     = document.getElementById("local-login-btn");
 const googleLoginBtn    = document.getElementById("google-login-btn");
 const themeToggleBtn    = document.getElementById("theme-toggle-btn");
+const logoutBtn         = document.getElementById("logout-btn");
+const modalLogoutBtn    = document.getElementById("modal-logout-btn");
 const userNameLabel     = document.getElementById("user-name");
 const userStatusLabel   = document.getElementById("user-status");
 
@@ -173,17 +175,28 @@ function setupAuth() {
 }
 
 function updateAccountUI() {
+  const isUserSignedIn = currentUser && currentUser.username && currentUser.username !== "Guest User";
   userNameLabel.textContent = currentUser.username || "Guest User";
-  if (currentUser.isCloud) {
-    userStatusLabel.innerHTML = '<i class="fa-solid fa-cloud" style="color:#00e5ff;"></i> Account Active';
-    authBtn.innerHTML = '<i class="fa-solid fa-user-check"></i> Profile';
-  } else if (currentUser.username && currentUser.username !== "Guest User") {
+  
+  if (isUserSignedIn) {
     userStatusLabel.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> Signed In';
     authBtn.innerHTML = '<i class="fa-solid fa-user-gear"></i> Account';
+    if (modalLogoutBtn) modalLogoutBtn.style.display = "block";
+    if (logoutBtn) logoutBtn.style.display = "flex";
   } else {
-    userStatusLabel.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:#ef4444;"></i> Action Required';
+    userStatusLabel.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:#ef4444;"></i> Sign In Required';
     authBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
+    if (modalLogoutBtn) modalLogoutBtn.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "none";
   }
+}
+
+function handleSignOut() {
+  localStorage.removeItem("qp_user");
+  currentUser = { username: "Guest User", isCloud: false };
+  updateAccountUI();
+  if (authModal) authModal.classList.add("active", "mandatory-auth");
+  sysMsg("Signed out successfully. Please sign in to continue on this device.");
 }
 
 function saveAccountState() {
@@ -431,6 +444,14 @@ function setupListeners() {
     if (authModal) authModal.classList.remove("active", "mandatory-auth");
     sysMsg("Welcome back, " + name + "! 😊");
   });
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => handleSignOut());
+  }
+
+  if (modalLogoutBtn) {
+    modalLogoutBtn.addEventListener("click", () => handleSignOut());
+  }
 
   closeLightboxBtn.addEventListener("click", () => lightboxModal.classList.remove("active"));
   lightboxModal.addEventListener("click", (e) => { if (e.target === lightboxModal) lightboxModal.classList.remove("active"); });
