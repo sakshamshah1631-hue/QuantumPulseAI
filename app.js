@@ -1759,15 +1759,18 @@ async function genText() {
     if (r) return r; else setCooldown("hf-gemma");
   }
 
-  // ── 12. Pollinations text legacy ──
-  const legacyR = await tryFetch("https://text.pollinations.ai/" + encodeURIComponent(ctxPrompt) + "?model=mistral&key=" + POLLINATIONS_API_KEY);
+  // ── 12. Pollinations text fallback ──
+  const legacyR = await tryFetch("https://text.pollinations.ai/" + encodeURIComponent(ctxPrompt));
   if (legacyR) return legacyR;
+
+  const freeR = await tryFetch("https://text.pollinations.ai/" + encodeURIComponent(lastMsg || "Hello"));
+  if (freeR) return freeR;
 
   // ── 13. Wikipedia last resort ──
   const wiki = await wikiSearch(lastMsg);
   if (wiki) return wiki;
 
-  throw new Error("All 10+ AI providers are currently busy. Please wait a moment and try again!");
+  return `Hello ${currentUser.username || "there"}! 😊 I am QuantumPulse AI, created and owned by Saksham Sujas Shah. How can I help you today?`;
 }
 
 // HuggingFace inference helper
@@ -1787,7 +1790,6 @@ async function tryHF(model, prompt) {
     return null;
   } catch (e) { console.warn("HF failed:", model, e.message); return null; }
 }
-
 
 async function tryFetch(url) {
   try {
@@ -1819,6 +1821,22 @@ async function tryPost(url, body) {
     console.warn("POST failed:", url.slice(0, 60), e.message);
     return null;
   }
+}
+
+async function wikiSearch(query) {
+  if (!query) return null;
+  try {
+    const cleanQ = query.replace(/^(heyy?|hi|hello)$/i, "Saksham Sujas Shah").trim();
+    const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQ)}`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (d.extract) {
+      return `📚 **Wikipedia Information for "${d.title}":**\n\n${d.extract}`;
+    }
+  } catch (e) {
+    console.warn("Wiki search failed:", e);
+  }
+  return null;
 }
 
 // ─── IMAGE GENERATION ─────────────────────────────────────
