@@ -14,19 +14,7 @@ const clearBtn         = document.getElementById("clear-btn");
 const modeToggleBtn    = document.getElementById("mode-toggle-btn");
 const modeIcon         = document.getElementById("mode-icon");
 const modeLabel        = document.getElementById("mode-label");
-const providerBadge    = document.getElementById("provider-badge");
-const badgeText        = document.getElementById("badge-text");
 const activeProvLabel  = document.getElementById("active-provider-label");
-const settingsModal    = document.getElementById("settings-modal");
-const closeModalBtn    = document.getElementById("close-modal-btn");
-const saveSettingsBtn  = document.getElementById("save-settings-btn");
-const openaiKeyGroup   = document.getElementById("openai-key-group");
-const openaiKeyInput   = document.getElementById("openai-api-key");
-const toggleKeyVisBtn  = document.getElementById("toggle-key-visibility");
-const radioFree        = document.getElementById("prov-free");
-const radioOpenAI      = document.getElementById("prov-openai");
-const radioFreeLabel   = document.getElementById("radio-free-label");
-const radioOpenAILabel = document.getElementById("radio-openai-label");
 const lightboxModal    = document.getElementById("lightbox-modal");
 const closeLightboxBtn = document.getElementById("close-lightbox");
 const lightboxImg      = document.getElementById("lightbox-img");
@@ -53,14 +41,11 @@ const sidebarThemeBtn   = document.getElementById("sidebar-theme-btn");
 const logoutBtn         = document.getElementById("logout-btn");
 const modalLogoutBtn    = document.getElementById("modal-logout-btn");
 const sidebarLogoutBtn  = document.getElementById("sidebar-logout-btn");
-const modelSelect       = document.getElementById("model-select");
-const headerModelSelect = document.getElementById("header-model-select");
 const userNameLabel     = document.getElementById("user-name");
 const userStatusLabel   = document.getElementById("user-status");
 
 // ─── STATE & EXPRESSIVE SYSTEM PROMPT ──────────────────────
-let currentMode     = 'chat'; // 'chat' | 'image' | 'video'
-let selectedAIModel = 'mixed'; // 'mixed' (Recommended) | 'pro' | 'vision' | 'cinema' | 'analyst' | 'fast'
+let currentMode     = 'chat'; // 'chat' | 'story' | 'image'
 let currentProvider = getSavedProvider();
 let openaiKey       = getSavedOpenAIKey();
 let pendingFiles    = [];
@@ -465,24 +450,6 @@ function setupListeners() {
   if (modalLogoutBtn) {
     modalLogoutBtn.addEventListener("click", () => handleSignOut());
   }
-
-  function handleModelChange(val) {
-    selectedAIModel = val;
-    if (modelSelect) modelSelect.value = val;
-    if (headerModelSelect) headerModelSelect.value = val;
-    const modelNames = {
-      mixed: "Mixed (Recommended) ⚡",
-      pro: "QuantumPulse Pro (Reasoning) 🧠",
-      vision: "QuantumPulse Vision (Art) 🎨",
-      cinema: "QuantumPulse Cinema (Movie) 🎬",
-      analyst: "QuantumPulse Analyst (Data) 📊",
-      fast: "QuantumPulse Fast (Ultra Speed) ⚡"
-    };
-    sysMsg(`Switched AI Model to ${modelNames[selectedAIModel] || selectedAIModel}`);
-  }
-
-  if (modelSelect) modelSelect.addEventListener("change", (e) => handleModelChange(e.target.value));
-  if (headerModelSelect) headerModelSelect.addEventListener("change", (e) => handleModelChange(e.target.value));
 
   closeLightboxBtn.addEventListener("click", () => lightboxModal.classList.remove("active"));
   lightboxModal.addEventListener("click", (e) => { if (e.target === lightboxModal) lightboxModal.classList.remove("active"); });
@@ -1487,11 +1454,6 @@ function applyMode() {
     modeLabel.textContent = 'Image';
     modeToggleBtn.classList.add('image-mode');
     userInput.placeholder = 'Describe the image to generate...';
-  } else if (currentMode === 'image') {
-    modeIcon.className = 'fa-solid fa-image';
-    modeLabel.textContent = 'Image';
-    modeToggleBtn.classList.add('image-mode');
-    userInput.placeholder = 'Describe the image to generate...';
   } else {
     modeIcon.className = 'fa-solid fa-message';
     modeLabel.textContent = 'Chat';
@@ -1540,8 +1502,8 @@ async function handleSubmit(e) {
           chatHistory.push({ role: 'assistant', content: visionReply });
 
         } else if (entry.type === 'video') {
-          renderVideo(entry.dataUrl, entry.file.name);
           typ.remove();
+          addMsg(`📎 Video file **${entry.file.name}** received! Video playback is not currently supported.`, 'bot');
         } else if (entry.extractedText) {
           const question = raw || `Analyze this ${entry.type.toUpperCase()} file and give me a clear summary.`;
           const contextMsg = `The user uploaded a ${entry.type.toUpperCase()} file named "${entry.file.name}". Content:\n\n${entry.extractedText.slice(0, 5000)}\n\nQuestion: ${question}`;
@@ -1611,7 +1573,7 @@ async function handleSubmit(e) {
 
 // ─── AI IMAGE VISION ──────────────────────────────────────
 async function analyzeImageWithAI(dataUrl, question) {
-  if (typeof puter !== 'undefined') {
+  if (typeof puter !== 'undefined' && puter.ai) {
     try {
       const resp = await puter.ai.chat([{
         role: 'user',
@@ -1633,18 +1595,6 @@ async function analyzeImageWithAI(dataUrl, question) {
 //  When one provider hits its limit, auto-switches to next.
 //  Cooldown tracking prevents re-using rate-limited endpoints.
 // ═══════════════════════════════════════════════════════════
-
-// Cooldown tracker: endpoint → timestamp when it's usable again
-const rateLimitCooldown = {};
-const COOLDOWN_MS = 5 * 60 * 1000; // 5 min cooldown per provider
-
-function isOnCooldown(key) {
-  return rateLimitCooldown[key] && Date.now() < rateLimitCooldown[key];
-}
-function setCooldown(key) {
-  rateLimitCooldown[key] = Date.now() + COOLDOWN_MS;
-  console.warn(`[Nexus AI] Provider "${key}" rate-limited. Cooling down for 5 min.`);
-}
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 3500) {
   const controller = new AbortController();
@@ -1738,56 +1688,6 @@ async function genText() {
   return `Hello ${currentUser.username || "there"}! 😊 I am QuantumPulse AI, created and owned by Saksham Sujas Shah. I am ready to help you! What would you like to build or discuss?`;
 }
 
-// HuggingFace inference helper
-async function tryHF(model, prompt) {
-  try {
-    const r = await fetch("https://api-inference.huggingface.co/models/" + model, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputs: prompt, parameters: { max_new_tokens: 512, temperature: 0.7, return_full_text: false } }),
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    if (Array.isArray(d) && d[0]?.generated_text) {
-      const t = d[0].generated_text.trim();
-      if (t && t.length > 3 && !t.includes("Loading")) return t;
-    }
-    return null;
-  } catch (e) { console.warn("HF failed:", model, e.message); return null; }
-}
-
-async function tryFetch(url) {
-  try {
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    const t = await r.text();
-    if (!t || t.length < 5) return null;
-    if (t.includes("Authentication required")) return null;
-    if (t.includes("Internal Server Error")) return null;
-    if (t.toLowerCase().startsWith("{") && t.includes('"error"')) return null;
-    return t.trim();
-  } catch (e) { console.warn("GET failed:", e.message); return null; }
-}
-
-async function tryPost(url, body) {
-  try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + POLLINATIONS_API_KEY },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) return null;
-    const d = await r.json().catch(() => null);
-    if (!d) return null;
-    const t = d.choices?.[0]?.message?.content;
-    if (!t || t.length < 5) return null;
-    return t.trim();
-  } catch (e) {
-    console.warn("POST failed:", url.slice(0, 60), e.message);
-    return null;
-  }
-}
-
 async function wikiSearch(query) {
   if (!query) return null;
   try {
@@ -1851,144 +1751,6 @@ function renderImage(url, prompt) {
   addMsg(card, "bot");
 }
 
-// ─── VIDEO GENERATION ─────────────────────────────────────
-// Generates a REAL .webm video using Canvas + MediaRecorder API.
-// AI frames from Pollinations are rendered on canvas with smooth
-// zoom-pan + crossfade transitions and recorded as actual video.
-async function genVideo(prompt) {
-
-  // ── Step 1: Generate 8 cinematic AI frames ──
-  const scenes = [
-    `${prompt}, cinematic wide establishing shot, dramatic golden hour lighting, 8k`,
-    `${prompt}, medium shot approaching, natural motion, photorealistic`,
-    `${prompt}, dynamic action close-up, sharp detail, professional photography`,
-    `${prompt}, bird's eye aerial view, sweeping motion, cinematic`,
-    `${prompt}, dramatic side profile, motion blur, high contrast`,
-    `${prompt}, intense zoom, sharp focus, cinematic color grading`,
-    `${prompt}, wide angle panoramic, depth of field, sunset light`,
-    `${prompt}, final cinematic frame, beautiful composition, 4k`,
-  ];
-  const baseSeed = Math.floor(Math.random() * 999999);
-  const frameUrls = scenes.map((desc, i) =>
-    FREE_IMAGE_ENDPOINT + encodeURIComponent(desc) +
-    "?width=768&height=432&seed=" + (baseSeed + i * 137) + "&nologo=true"
-  );
-
-  // Use wsrv.nl - an extremely reliable global image proxy CDN that automatically handles CORS
-  const images = [];
-  for (const url of frameUrls) {
-    const proxyUrl = "https://wsrv.nl/?url=" + encodeURIComponent(url) + "&output=webp";
-    const img = await new Promise((resolve) => {
-      const i = new Image();
-      i.crossOrigin = "anonymous";
-      i.onload = () => resolve(i);
-      i.onerror = () => resolve(null);
-      i.src = proxyUrl;
-    });
-    if (img) images.push(img);
-  }
-
-  const validImages = images.filter(Boolean);
-  if (validImages.length < 2) throw new Error("Could not load enough frames. The image server might be busy — please try again in a moment.");
-
-  // ── Step 2: Record canvas as real video ──
-  const W = 768, H = 432;
-  const canvas = document.createElement("canvas");
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext("2d");
-
-  const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-    ? "video/webm;codecs=vp9"
-    : MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4";
-
-  const stream = canvas.captureStream(30);
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2500000 });
-  const chunks = [];
-  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
-  const FPS = 30;
-  const HOLD_SECS = 1.5;      // seconds per image
-  const FADE_SECS = 0.6;      // crossfade duration
-  const ZOOM_AMOUNT = 0.04;   // subtle Ken Burns zoom
-
-  // Draw each frame with Ken Burns (slow zoom) + crossfade between images
-  function drawFrame(imgA, imgB, progress) {
-    const zoomA = 1 + ZOOM_AMOUNT * progress;
-    const offX = ((zoomA - 1) * W) / 2;
-    const offY = ((zoomA - 1) * H) / 2;
-
-    ctx.globalAlpha = 1;
-    ctx.drawImage(imgA, -offX, -offY, W * zoomA, H * zoomA);
-
-    if (imgB && progress > (HOLD_SECS - FADE_SECS) / HOLD_SECS) {
-      const fadeProgress = (progress - (HOLD_SECS - FADE_SECS) / HOLD_SECS) /
-                           (FADE_SECS / HOLD_SECS);
-      const zoomB = 1 + ZOOM_AMOUNT * fadeProgress * 0.5;
-      ctx.globalAlpha = Math.min(fadeProgress, 1);
-      ctx.drawImage(imgB, 0, 0, W * zoomB, H * zoomB);
-    }
-  }
-
-  return new Promise((resolve, reject) => {
-    recorder.start(100);
-    let imgIdx = 0;
-    let frameInSegment = 0;
-    const framesPerSegment = Math.round(FPS * HOLD_SECS);
-
-    function renderNext() {
-      if (imgIdx >= validImages.length) {
-        recorder.stop();
-        return;
-      }
-      const imgA = validImages[imgIdx];
-      const imgB = validImages[imgIdx + 1] || null;
-      const progress = frameInSegment / framesPerSegment;
-
-      drawFrame(imgA, imgB, progress);
-      frameInSegment++;
-
-      if (frameInSegment >= framesPerSegment) {
-        imgIdx++;
-        frameInSegment = 0;
-      }
-      setTimeout(renderNext, 1000 / FPS);
-    }
-
-    recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: mimeType });
-      if (blob.size < 1000) { reject(new Error("Video recording too small, please retry.")); return; }
-      resolve({ type: "mp4", url: URL.createObjectURL(blob), download: mimeType.includes("webm") ? ".webm" : ".mp4" });
-    };
-    recorder.onerror = (e) => reject(new Error("Recording failed: " + e.message));
-
-    renderNext();
-  });
-}
-
-// ─── VIDEO CARD ───────────────────────────────────────────
-function renderVideo(result, prompt) {
-  const card = document.createElement("div"); card.className = "ai-video-card";
-  const header = document.createElement("div"); header.className = "ai-video-header";
-  header.innerHTML = '<i class="fa-solid fa-film"></i> AI Generated Video';
-
-  const video = document.createElement("video");
-  video.src = result.url;
-  video.controls = true; video.autoplay = true;
-  video.loop = true; video.muted = false; video.playsInline = true;
-  video.style.cssText = "width:100%;border-radius:10px;background:#000;display:block;";
-
-  const acts = document.createElement("div"); acts.className = "ai-image-actions";
-  const ps = document.createElement("span"); ps.className = "ai-image-prompt";
-  ps.textContent = '🎬 "' + prompt + '"';
-  const ext = result.download || ".webm";
-  const dl = document.createElement("a"); dl.className = "dl-link";
-  dl.href = result.url; dl.download = "quantumpulse-ai-video-" + Date.now() + ext;
-  dl.innerHTML = '<i class="fa-solid fa-download"></i> Download Video';
-  acts.append(ps, dl);
-
-  card.append(header, video, acts);
-  addMsg(card, "bot");
-}
 
 // ─── AI STORY MOVIE GENERATOR & PLAYER (Multi-Image, Hindi & Custom Duration) ──────
 async function generateAIStoryMovie(theme, updateProgress) {
@@ -2037,8 +1799,12 @@ Make sure to generate EXACTLY ${targetScenes} detailed scenes in the JSON array!
   let storyData;
   try {
     chatHistory.push({ role: "user", content: storySystemPrompt });
-    const aiRawText = await genText();
-    chatHistory.pop(); // clean temporary prompt from history
+    let aiRawText;
+    try {
+      aiRawText = await genText();
+    } finally {
+      chatHistory.pop(); // clean temporary prompt from history
+    }
     
     const jsonMatch = aiRawText.match(/\{[\s\S]*\}/);
     storyData = JSON.parse(jsonMatch ? jsonMatch[0] : aiRawText);

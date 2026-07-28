@@ -9,7 +9,7 @@ export const PROVIDERS = {
 export const POLLINATIONS_API_KEY = "sk_23xOY22WU7BgYlls40W57r1vKuTmPMNH";
 
 // Pollinations Endpoints (2026)
-export const POLLINATIONS_CHAT_ENDPOINT = "https://gen.pollinations.ai/v1/chat/completions";
+
 export const FREE_IMAGE_ENDPOINT = "https://image.pollinations.ai/prompt/";
 
 // OpenAI Endpoints
