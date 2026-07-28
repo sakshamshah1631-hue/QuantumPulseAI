@@ -1646,11 +1646,24 @@ function setCooldown(key) {
   console.warn(`[Nexus AI] Provider "${key}" rate-limited. Cooling down for 5 min.`);
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 3500) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
+
 async function genText() {
   const currentSysPrompt = getSystemPrompt();
   chatHistory[0] = { role: "system", content: currentSysPrompt };
 
-  // 1. OpenAI (user key)
+  // 1. OpenAI (user key if provided)
   if (currentProvider === PROVIDERS.OPENAI) {
     if (!openaiKey) throw new Error("No OpenAI key set! Click Settings to add your key.");
     const r = await fetch(OPENAI_CHAT_ENDPOINT, {
@@ -1663,9 +1676,29 @@ async function genText() {
     return d.choices[0].message.content.trim();
   }
 
-  // 2. High-Speed Free GPT-4o Priority Path (CORS & Payload Safe)
+  const msgs = chatHistory.map(m => ({ role: m.role, content: m.content }));
+  const lastMsg = chatHistory.filter(m => m.role === "user").slice(-1)[0]?.content || "";
+
+  // 2. Puter JS SDK (GPT-4o-mini) — Responds in ~1-2 seconds!
+  if (typeof puter !== "undefined" && puter.ai) {
+    try {
+      const puterPromise = puter.ai.chat(msgs, { model: "gpt-4o-mini" });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Puter timeout")), 3500)
+      );
+      const resp = await Promise.race([puterPromise, timeoutPromise]);
+      const text = typeof resp === "string" ? resp : resp?.message?.content || resp?.content || "";
+      if (text && text.trim().length > 2) {
+        return text.trim();
+      }
+    } catch (e) {
+      console.warn("Puter AI fast check failed:", e.message);
+    }
+  }
+
+  // 3. Fast Pollinations POST (Max 3.5 sec timeout)
   try {
-    const res = await fetch("https://text.pollinations.ai/", {
+    const res = await fetchWithTimeout("https://text.pollinations.ai/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1673,7 +1706,7 @@ async function genText() {
         model: "openai",
         jsonMode: false
       })
-    });
+    }, 3500);
     if (res.ok) {
       const text = await res.text();
       if (text && text.trim().length > 3) {
@@ -1681,24 +1714,28 @@ async function genText() {
       }
     }
   } catch (e) {
-    console.warn("Fast priority fallback failed:", e);
+    console.warn("Pollinations POST timeout/failed:", e.message);
   }
 
-  // 3. Fast GET fallback
-  const lastMsg = chatHistory.filter(m => m.role === "user").slice(-1)[0]?.content || "";
+  // 4. Fast Pollinations GET (Max 3 sec timeout)
   try {
-    const res = await fetch("https://text.pollinations.ai/" + encodeURIComponent(lastMsg || "Hello"));
+    const res = await fetchWithTimeout("https://text.pollinations.ai/" + encodeURIComponent(lastMsg || "Hello"), {}, 3000);
     if (res.ok) {
       const text = await res.text();
-      if (text && text.trim().length > 3) return text.trim();
+      if (text && text.trim().length > 3 && !text.includes("Internal Server Error")) {
+        return text.trim();
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn("Pollinations GET timeout/failed:", e.message);
+  }
 
-  // 4. Wikipedia summary fallback
+  // 5. Wikipedia summary fallback
   const wiki = await wikiSearch(lastMsg);
   if (wiki) return wiki;
 
-  return `Hello ${currentUser.username || "there"}! 😊 I am QuantumPulse AI, created and owned by Saksham Sujas Shah. How can I help you today?`;
+  // 6. Immediate Smart Response
+  return `Hello ${currentUser.username || "there"}! 😊 I am QuantumPulse AI, created and owned by Saksham Sujas Shah. I am ready to help you! What would you like to build or discuss?`;
 }
 
 // HuggingFace inference helper
