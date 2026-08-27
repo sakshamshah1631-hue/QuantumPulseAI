@@ -1734,42 +1734,43 @@ async function handleSubmit(e) {
       chatHistory.push({ role: 'user', content: 'Generate image: ' + prompt });
       chatHistory.push({ role: 'assistant', content: '[Image generated for: ' + prompt + ']' });
 
-
-
     } else {
-      // ── Instant client-side answers for common questions (no API call needed) ──
       const q = prompt.toLowerCase().trim();
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
       const dateStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       const yearStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric' });
 
-      if (/^(what('?s| is| are)?\s+)?(the\s+)?(current\s+)?(time|clock|baje|waqt|samay)(\s*now|\s*is it|\?)*$/i.test(q) ||
+      // News keywords — if present, NEVER use instant date/time handlers
+      const hasNewsWord = /\b(news|breaking|latest|happened|accident|murder|rape|flood|disaster|earthquake|attack|blast|bomb|fire|riot|protest|election|result|score|weather|storm|cyclone|cricket|politics|crime|arrested|killed|died|death|injured|emergency|alert|headline|report|viral|recent|khabar)\b/i.test(q);
+
+      if (!hasNewsWord && (/^(what('?s| is| are)?\s+)?(the\s+)?(current\s+)?(time|clock|baje|waqt|samay)(\s*now|\s*is it|\?)*$/i.test(q) ||
           /^(time|what time)(\?)?$/i.test(q) ||
           /\bwhat('?s| is) the time\b/i.test(q) ||
-          /\bcurrent time\b/i.test(q)) {
+          /\bcurrent time\b/i.test(q))) {
         typ.remove();
         const reply = `⏰ The current time is **${timeStr} IST** (Indian Standard Time)!\n\n📅 Today is **${dateStr}**. Hope your day is going great, ${name.split(' ')[0]}! 😊 What else can I help you with?`;
         addMsg(reply, 'bot');
         chatHistory.push({ role: 'user', content: prompt });
         chatHistory.push({ role: 'assistant', content: reply });
-      } else if (/^(what('?s| is)?\s+)?(today('?s)?\s+)?(date|din|aaj|today)(\?)?$/i.test(q) ||
+      } else if (!hasNewsWord && (/^(what('?s| is)?\s+)?(today('?s)?\s+)?(date|din|aaj|today)(\?)?$/i.test(q) ||
                  /\btoday('?s)? date\b/i.test(q) ||
-                 /\bwhat('?s| is) today\b/i.test(q)) {
+                 /^what('?s| is) today\??$/i.test(q))) {
         typ.remove();
         const reply = `📅 Today is **${dateStr}**!\n\n⏰ Current time: **${timeStr} IST**. How can I help you today? 😊`;
         addMsg(reply, 'bot');
         chatHistory.push({ role: 'user', content: prompt });
         chatHistory.push({ role: 'assistant', content: reply });
-      } else if (/\bwhat('?s| is)?\s+(the\s+)?year\b/i.test(q) || /\bcurrent year\b/i.test(q)) {
+      } else if (!hasNewsWord && (/\bwhat('?s| is)?\s+(the\s+)?year\b/i.test(q) || /\bcurrent year\b/i.test(q))) {
         typ.remove();
         const reply = `📅 The current year is **${yearStr}**! 🚀`;
         addMsg(reply, 'bot');
         chatHistory.push({ role: 'user', content: prompt });
         chatHistory.push({ role: 'assistant', content: reply });
       } else {
-        // ── Check if this is a news/current events query ──
-        const isNewsQuery = /\b(news|breaking|latest|current|today|yesterday|recent|aaj|abhi|just now|happened|accident|murder|rape|flood|disaster|earthquake|attack|blast|bomb|fire|riot|protest|election|result|match|score|weather|storm|cyclone|cricket|politics|crime|arrested|killed|died|death|injured|hospital|emergency|alert|update|headline|report|happened|breaking|viral)\b/i.test(q);
+        // ── News/current events query (includes hasNewsWord + yesterday/today in news context) ──
+        const isNewsQuery = hasNewsWord ||
+          /\b(news|breaking|latest|current|yesterday|recent|aaj|abhi|happened|flood|disaster|earthquake|attack|riot|protest|election|score|weather|storm|cyclone|cricket|politics|crime|arrested|killed|died|injured|emergency|alert|headline|report|viral)\b/i.test(q);
 
         if (isNewsQuery) {
           // Show a news-fetching indicator
