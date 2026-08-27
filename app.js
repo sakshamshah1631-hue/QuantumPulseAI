@@ -58,6 +58,14 @@ let activeChatId  = localStorage.getItem("qp_active_chat") || null;
 function getSystemPrompt() {
   const name = currentUser && currentUser.username ? currentUser.username : "Guest User";
 
+  // Live date/time injection
+  const now = new Date();
+  const timeOptions = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+  const dateOptions = { timeZone: 'Asia/Kolkata', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const liveTime = now.toLocaleTimeString('en-IN', timeOptions);
+  const liveDate = now.toLocaleDateString('en-IN', dateOptions);
+  const liveDateTime = `${liveDate} — ${liveTime} IST`;
+
   // Extract past chat messages across all threads for full global memory
   let pastChatsSummary = "";
   if (Array.isArray(conversations) && conversations.length > 0) {
@@ -76,6 +84,27 @@ function getSystemPrompt() {
   }
 
   return `You are QuantumPulse AI — an extraordinarily brilliant, expressive, warm, witty, and deeply intelligent AI assistant created and owned by Saksham Sujas Shah.
+
+════════════════════════════════════════════
+🕐 LIVE DATE & TIME (CRITICAL — Always use this)
+════════════════════════════════════════════
+- RIGHT NOW it is: **${liveDateTime}**
+- When anyone asks "what time is it?", "what's the time?", "current time?", "what day is it?", "what is today's date?", "what year is it?" — answer INSTANTLY using the above time. Do NOT say you don't know the time.
+- You are fully aware of the current date and time at ALL TIMES.
+
+════════════════════════════════════════════
+📰 WORLD KNOWLEDGE (Up to August 2026)
+════════════════════════════════════════════
+You have comprehensive knowledge of world events, facts, and information up to August 2026. Key facts:
+- Current year: 2026. Current month: August.
+- India: PM Narendra Modi leads the government. India is a growing global tech and economic power.
+- AI World: Major AI models include GPT-4o, Claude 3.5, Gemini 1.5/2.0, Llama 3, Mistral. AI is transforming every industry.
+- Tech Giants: Apple, Google, Microsoft, Meta, Amazon, Tesla, NVIDIA dominate global tech.
+- Space: ISRO's Chandrayaan-3 successfully landed on the Moon's south pole in 2023. SpaceX Starship tests continue.
+- Sports: India's cricket team remains among the world's best. ICC events, IPL, FIFA, Olympics are major global events.
+- Education (India): CBSE, ICSE, SSC boards. JEE, NEET are key engineering/medical entrance exams.
+- Economy: India is the world's 5th largest economy. UPI is one of the world's largest digital payment systems.
+- Sinhgad Springdale School, Ambegaon, Pune: A well-known school in Pune where Saksham Sujas Shah studies.
 
 ════════════════════════════════════════════
 🧠 SECTION 1: CROSS-CONVERSATION MEMORY (CRITICAL)
@@ -1708,12 +1737,45 @@ async function handleSubmit(e) {
 
 
     } else {
-      chatHistory.push({ role: 'user', content: prompt });
-      const reply = await genText();
-      typ.remove();
-      addMsg(reply, 'bot');
-      chatHistory.push({ role: 'assistant', content: reply });
-      if (chatHistory.length > 31) chatHistory = [chatHistory[0], ...chatHistory.slice(-30)];
+      // ── Instant client-side answers for common questions (no API call needed) ──
+      const q = prompt.toLowerCase().trim();
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      const dateStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const yearStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric' });
+
+      if (/^(what('?s| is| are)?\s+)?(the\s+)?(current\s+)?(time|clock|baje|waqt|samay)(\s*now|\s*is it|\?)*$/i.test(q) ||
+          /^(time|what time)(\?)?$/i.test(q) ||
+          /\bwhat('?s| is) the time\b/i.test(q) ||
+          /\bcurrent time\b/i.test(q)) {
+        typ.remove();
+        const reply = `⏰ The current time is **${timeStr} IST** (Indian Standard Time)!\n\n📅 Today is **${dateStr}**. Hope your day is going great, ${name.split(' ')[0]}! 😊 What else can I help you with?`;
+        addMsg(reply, 'bot');
+        chatHistory.push({ role: 'user', content: prompt });
+        chatHistory.push({ role: 'assistant', content: reply });
+      } else if (/^(what('?s| is)?\s+)?(today('?s)?\s+)?(date|din|aaj|today)(\?)?$/i.test(q) ||
+                 /\btoday('?s)? date\b/i.test(q) ||
+                 /\bwhat('?s| is) today\b/i.test(q)) {
+        typ.remove();
+        const reply = `📅 Today is **${dateStr}**!\n\n⏰ Current time: **${timeStr} IST**. How can I help you today? 😊`;
+        addMsg(reply, 'bot');
+        chatHistory.push({ role: 'user', content: prompt });
+        chatHistory.push({ role: 'assistant', content: reply });
+      } else if (/\bwhat('?s| is)?\s+(the\s+)?year\b/i.test(q) || /\bcurrent year\b/i.test(q)) {
+        typ.remove();
+        const reply = `📅 The current year is **${yearStr}**! 🚀`;
+        addMsg(reply, 'bot');
+        chatHistory.push({ role: 'user', content: prompt });
+        chatHistory.push({ role: 'assistant', content: reply });
+      } else {
+        // Normal AI call
+        chatHistory.push({ role: 'user', content: prompt });
+        const reply = await genText();
+        typ.remove();
+        addMsg(reply, 'bot');
+        chatHistory.push({ role: 'assistant', content: reply });
+        if (chatHistory.length > 31) chatHistory = [chatHistory[0], ...chatHistory.slice(-30)];
+      }
     }
     autoSaveChat(prompt);
   } catch (err) {
@@ -1838,7 +1900,16 @@ async function genText() {
   if (wiki) return wiki;
 
   // 6. Immediate Smart Response
-  return `Hello ${currentUser.username || "there"}! 😊 I am QuantumPulse AI, created and owned by Saksham Sujas Shah. I am ready to help you! What would you like to build or discuss?`;
+  // Smart fallback: try to give a relevant answer based on what the user asked
+  const lastUserMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+  const dateStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  if (/time|clock|baje/i.test(lastUserMsg)) return `⏰ The current time is **${timeStr} IST**! 😊`;
+  if (/date|today|din|aaj/i.test(lastUserMsg)) return `📅 Today is **${dateStr}**! 😊`;
+  if (/who (are|is) you|your name|what are you/i.test(lastUserMsg)) return `I'm **QuantumPulse AI** — created and owned by **Saksham Sujas Shah**! 🚀 How can I help you today?`;
+  if (/hi|hello|hey|namaste|hii/i.test(lastUserMsg)) return `Hey there! 👋 I'm **QuantumPulse AI**, your brilliant AI assistant! What can I do for you today? 😊`;
+  return `🤔 I'm having a little trouble connecting right now. Please try again in a moment — I'm here and ready to help! 😊`;
 }
 
 async function wikiSearch(query) {
