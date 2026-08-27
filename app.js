@@ -237,6 +237,41 @@ When the user asks for a story, poem, script, dialogue, or any creative content:
 
 let chatHistory = [{ role: "system", content: getSystemPrompt() }];
 
+// ─── PUTER LOGIN FREE MODE ────────────────────────────────
+let puterFreeMode = localStorage.getItem("qp_free_mode") === "true";
+const freeModeBtn = document.getElementById("free-mode-btn");
+
+function applyFreeModeUI() {
+  if (!freeModeBtn) return;
+  if (puterFreeMode) {
+    freeModeBtn.classList.add("free-mode-active");
+    freeModeBtn.title = "Puter Login Free Mode: ON — click to turn off";
+  } else {
+    freeModeBtn.classList.remove("free-mode-active");
+    freeModeBtn.title = "Puter Login Free Mode: OFF — click to enable (no login needed)";
+  }
+}
+
+if (freeModeBtn) {
+  freeModeBtn.addEventListener("click", () => {
+    puterFreeMode = !puterFreeMode;
+    localStorage.setItem("qp_free_mode", puterFreeMode);
+    applyFreeModeUI();
+    // Show a toast
+    const toast = document.createElement("div");
+    toast.className = "free-mode-toast";
+    toast.innerHTML = puterFreeMode
+      ? `<i class="fa-solid fa-bolt"></i> <strong>Puter Login Free Mode ON</strong> — Using Pollinations only. No login needed! ⚡`
+      : `<i class="fa-solid fa-bolt"></i> <strong>Puter Login Free Mode OFF</strong> — Puter AI (GPT-4o-mini) is now active.`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.classList.add("show"), 10);
+    setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 400); }, 3000);
+  });
+}
+
+applyFreeModeUI();
+
+
 // ─── INIT & LISTENERS ──────────────────────────────────────
 function init() {
   updateProviderUI();
@@ -1747,8 +1782,8 @@ async function genText() {
   const msgs = chatHistory.map(m => ({ role: m.role, content: m.content }));
   const lastMsg = chatHistory.filter(m => m.role === "user").slice(-1)[0]?.content || "";
 
-  // 2. Puter JS SDK (GPT-4o-mini) — Responds in ~1-2 seconds!
-  if (typeof puter !== "undefined" && puter.ai) {
+  // 2. Puter JS SDK (GPT-4o-mini) — Responds in ~1-2 seconds! (Skipped in Free Mode)
+  if (!puterFreeMode && typeof puter !== "undefined" && puter.ai) {
     try {
       const puterPromise = puter.ai.chat(msgs, { model: "gpt-4o-mini" });
       const timeoutPromise = new Promise((_, reject) => 

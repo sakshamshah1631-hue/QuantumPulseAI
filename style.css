@@ -1965,3 +1965,82 @@ body {
 .logout-danger-btn:hover {
   background: #dc2626;
 }
+
+/* ── PUTER LOGIN FREE MODE BUTTON ─────────────────────── */
+.free-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 2rem;
+  border: 1.5px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+.free-mode-btn:hover {
+  border-color: #f59e0b;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  transform: translateY(-1px);
+}
+.free-mode-btn.free-mode-active {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  border-color: transparent;
+  color: #fff !important;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.5);
+  animation: freeModePulse 2s infinite;
+}
+@keyframes freeModePulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(245, 158, 11, 0.5); }
+  50%       { box-shadow: 0 0 22px rgba(245, 158, 11, 0.8); }
+}
+.free-mode-btn i { font-size: 0.85rem; }
+.free-mode-label { font-size: 0.75rem; letter-spacing: 0.02em; }
+
+/* Hide the text label on very small screens, show icon only */
+@media (max-width: 480px) {
+  .free-mode-label { display: none; }
+  .free-mode-btn { padding: 0.35rem 0.6rem; border-radius: 50%; width: 36px; height: 36px; justify-content: center; }
+}
+
+/* ── FREE MODE TOAST NOTIFICATION ─────────────────────── */
+.free-mode-toast {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: linear-gradient(135deg, #1e1e2e, #2d2d44);
+  color: #fff;
+  padding: 0.75rem 1.4rem;
+  border-radius: 2rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  z-index: 9999;
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.free-mode-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.free-mode-toast i { color: #f59e0b; margin-right: 0.4rem; }
+
+@media (max-width: 480px) {
+  .free-mode-toast {
+    font-size: 0.78rem;
+    padding: 0.6rem 1rem;
+    bottom: 80px;
+    max-width: 90vw;
+    white-space: normal;
+    text-align: center;
+  }
+}
