@@ -1768,13 +1768,39 @@ async function handleSubmit(e) {
         chatHistory.push({ role: 'user', content: prompt });
         chatHistory.push({ role: 'assistant', content: reply });
       } else {
-        // Normal AI call
-        chatHistory.push({ role: 'user', content: prompt });
-        const reply = await genText();
-        typ.remove();
-        addMsg(reply, 'bot');
-        chatHistory.push({ role: 'assistant', content: reply });
-        if (chatHistory.length > 31) chatHistory = [chatHistory[0], ...chatHistory.slice(-30)];
+        // ── Check if this is a news/current events query ──
+        const isNewsQuery = /\b(news|breaking|latest|current|today|yesterday|recent|aaj|abhi|just now|happened|accident|murder|rape|flood|disaster|earthquake|attack|blast|bomb|fire|riot|protest|election|result|match|score|weather|storm|cyclone|cricket|politics|crime|arrested|killed|died|death|injured|hospital|emergency|alert|update|headline|report|happened|breaking|viral)\b/i.test(q);
+
+        if (isNewsQuery) {
+          // Show a news-fetching indicator
+          const bubble = typ.querySelector('.msg-bubble');
+          if (bubble) bubble.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div><div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px">📡 Fetching live news...</div>';
+
+          const newsData = await fetchLiveNews(prompt);
+          if (newsData) {
+            // Inject news into context as a system note
+            const newsContext = { role: 'user', content: `[LIVE NEWS CONTEXT — fetched right now from Google News]\n${newsData}\n\nUser's question: ${prompt}\n\nUsing the above live news, please answer the user's question in a helpful, detailed, and organized way. Mention sources and dates.` };
+            chatHistory.push(newsContext);
+          } else {
+            chatHistory.push({ role: 'user', content: prompt });
+          }
+          const reply = await genText();
+          // Remove the injected news context from history (keep chat clean)
+          if (newsData) chatHistory.pop();
+          chatHistory.push({ role: 'user', content: prompt });
+          typ.remove();
+          addMsg(reply, 'bot');
+          chatHistory.push({ role: 'assistant', content: reply });
+          if (chatHistory.length > 31) chatHistory = [chatHistory[0], ...chatHistory.slice(-30)];
+        } else {
+          // Normal AI call
+          chatHistory.push({ role: 'user', content: prompt });
+          const reply = await genText();
+          typ.remove();
+          addMsg(reply, 'bot');
+          chatHistory.push({ role: 'assistant', content: reply });
+          if (chatHistory.length > 31) chatHistory = [chatHistory[0], ...chatHistory.slice(-30)];
+        }
       }
     }
     autoSaveChat(prompt);
@@ -1804,6 +1830,67 @@ async function analyzeImageWithAI(dataUrl, question) {
   return 'I can see you uploaded an image! While my vision analysis is temporarily unavailable, you can describe it and ask me questions about the subject matter.';
 }
 
+
+// ─── LIVE NEWS FETCHER (Google News RSS via CORS Proxy) ──────
+async function fetchLiveNews(userQuery) {
+  try {
+    // Build a smart search query from user's message
+    const cleanQ = userQuery
+      .replace(/what(\'?s| is| are)?/gi, '')
+      .replace(/\b(the|a|an|in|of|for|about|tell me|give me|show me|latest|breaking|current|recent|today|yesterday)\b/gi, '')
+      .replace(/\?/g, '')
+      .trim()
+      .slice(0, 80) || 'India breaking news today';
+
+    // Try 3 different news RSS sources
+    const sources = [
+      // Google News - India
+      `https://news.google.com/rss/search?q=${encodeURIComponent(cleanQ + ' India')}&hl=en-IN&gl=IN&ceid=IN:en`,
+      // NDTV RSS
+      `https://feeds.feedburner.com/ndtvnews-top-stories`,
+      // Times of India
+      `https://timesofindia.indiatimes.com/rssfeedstopstories.cms`
+    ];
+
+    const corsProxy = 'https://api.allorigins.win/raw?url=';
+
+    for (const rssUrl of sources) {
+      try {
+        const res = await fetchWithTimeout(corsProxy + encodeURIComponent(rssUrl), {}, 6000);
+        if (!res.ok) continue;
+        const text = await res.text();
+
+        // Parse XML
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(text, 'text/xml');
+        const items = xml.querySelectorAll('item');
+        if (!items.length) continue;
+
+        const now = new Date();
+        const articles = [];
+        items.forEach((item, i) => {
+          if (i >= 10) return;
+          const title = item.querySelector('title')?.textContent?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '';
+          const desc = item.querySelector('description')?.textContent?.replace(/<[^>]*>/g, '').replace(/<!\[CDATA\[|\]\]>/g, '').trim().slice(0, 200) || '';
+          const pubDate = item.querySelector('pubDate')?.textContent || '';
+          const source = item.querySelector('source')?.textContent || new URL(rssUrl).hostname;
+          if (title) articles.push(`${i + 1}. **${title}**\n   Source: ${source} | ${pubDate}\n   ${desc}`);
+        });
+
+        if (articles.length > 0) {
+          return `📰 LIVE NEWS (fetched at ${now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true })} IST):\n\n${articles.join('\n\n')}`;
+        }
+      } catch (e) {
+        console.warn('News source failed:', e.message);
+        continue;
+      }
+    }
+    return null;
+  } catch (e) {
+    console.warn('fetchLiveNews failed:', e.message);
+    return null;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 //  UNLIMITED AI ENGINE — Smart 10-Provider Rotation
