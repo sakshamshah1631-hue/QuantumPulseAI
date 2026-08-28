@@ -266,40 +266,6 @@ When the user asks for a story, poem, script, dialogue, or any creative content:
 
 let chatHistory = [{ role: "system", content: getSystemPrompt() }];
 
-// ─── PUTER LOGIN FREE MODE ────────────────────────────────
-let puterFreeMode = localStorage.getItem("qp_free_mode") === "true";
-const freeModeBtn = document.getElementById("free-mode-btn");
-
-function applyFreeModeUI() {
-  if (!freeModeBtn) return;
-  if (puterFreeMode) {
-    freeModeBtn.classList.add("free-mode-active");
-    freeModeBtn.title = "Puter Login Free Mode: ON — click to turn off";
-  } else {
-    freeModeBtn.classList.remove("free-mode-active");
-    freeModeBtn.title = "Puter Login Free Mode: OFF — click to enable (no login needed)";
-  }
-}
-
-if (freeModeBtn) {
-  freeModeBtn.addEventListener("click", () => {
-    puterFreeMode = !puterFreeMode;
-    localStorage.setItem("qp_free_mode", puterFreeMode);
-    applyFreeModeUI();
-    // Show a toast
-    const toast = document.createElement("div");
-    toast.className = "free-mode-toast";
-    toast.innerHTML = puterFreeMode
-      ? `<i class="fa-solid fa-bolt"></i> <strong>Puter Login Free Mode ON</strong> — Using Pollinations only. No login needed! ⚡`
-      : `<i class="fa-solid fa-bolt"></i> <strong>Puter Login Free Mode OFF</strong> — Puter AI (GPT-4o-mini) is now active.`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.classList.add("show"), 10);
-    setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 400); }, 3000);
-  });
-}
-
-applyFreeModeUI();
-
 
 // ─── INIT & LISTENERS ──────────────────────────────────────
 function init() {
@@ -1932,56 +1898,70 @@ async function genText() {
   const msgs = chatHistory.map(m => ({ role: m.role, content: m.content }));
   const lastMsg = chatHistory.filter(m => m.role === "user").slice(-1)[0]?.content || "";
 
-  // 2. Puter JS SDK (GPT-4o-mini) — Responds in ~1-2 seconds! (Skipped in Free Mode)
-  if (!puterFreeMode && typeof puter !== "undefined" && puter.ai) {
+  // 2. Puter JS SDK (GPT-4o-mini) — try if available and logged in
+  if (typeof puter !== "undefined" && puter.ai) {
     try {
       const puterPromise = puter.ai.chat(msgs, { model: "gpt-4o-mini" });
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Puter timeout")), 3500)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Puter timeout")), 8000)
       );
       const resp = await Promise.race([puterPromise, timeoutPromise]);
       const text = typeof resp === "string" ? resp : resp?.message?.content || resp?.content || "";
-      if (text && text.trim().length > 2) {
-        return text.trim();
-      }
+      if (text && text.trim().length > 2) return text.trim();
     } catch (e) {
-      console.warn("Puter AI fast check failed:", e.message);
+      console.warn("Puter AI failed:", e.message);
     }
   }
 
-  // 3. Fast Pollinations POST (Max 3.5 sec timeout)
+  // 3. Pollinations POST — openai model (15s timeout)
   try {
     const res = await fetchWithTimeout("https://text.pollinations.ai/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: chatHistory,
-        model: "openai",
-        jsonMode: false
-      })
-    }, 3500);
+      body: JSON.stringify({ messages: chatHistory, model: "openai", jsonMode: false })
+    }, 15000);
     if (res.ok) {
       const text = await res.text();
-      if (text && text.trim().length > 3) {
-        return text.trim();
-      }
+      if (text && text.trim().length > 3) return text.trim();
     }
-  } catch (e) {
-    console.warn("Pollinations POST timeout/failed:", e.message);
-  }
+  } catch (e) { console.warn("Pollinations POST (openai) failed:", e.message); }
 
-  // 4. Fast Pollinations GET (Max 3 sec timeout)
+  // 4. Pollinations POST — mistral model (12s timeout)
   try {
-    const res = await fetchWithTimeout("https://text.pollinations.ai/" + encodeURIComponent(lastMsg || "Hello"), {}, 3000);
+    const res = await fetchWithTimeout("https://text.pollinations.ai/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: chatHistory, model: "mistral", jsonMode: false })
+    }, 12000);
     if (res.ok) {
       const text = await res.text();
-      if (text && text.trim().length > 3 && !text.includes("Internal Server Error")) {
-        return text.trim();
-      }
+      if (text && text.trim().length > 3) return text.trim();
     }
-  } catch (e) {
-    console.warn("Pollinations GET timeout/failed:", e.message);
-  }
+  } catch (e) { console.warn("Pollinations POST (mistral) failed:", e.message); }
+
+  // 5. Pollinations POST — openai-large model (12s timeout)
+  try {
+    const res = await fetchWithTimeout("https://text.pollinations.ai/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: chatHistory, model: "openai-large", jsonMode: false })
+    }, 12000);
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.trim().length > 3) return text.trim();
+    }
+  } catch (e) { console.warn("Pollinations POST (openai-large) failed:", e.message); }
+
+  // 6. Pollinations GET fallback (10s timeout)
+  try {
+    const sysCtx = `You are QuantumPulse AI by Saksham Sujas Shah. Answer: ${lastMsg}`;
+    const res = await fetchWithTimeout("https://text.pollinations.ai/" + encodeURIComponent(sysCtx), {}, 10000);
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.trim().length > 3 && !text.includes("Internal Server Error")) return text.trim();
+    }
+  } catch (e) { console.warn("Pollinations GET failed:", e.message); }
+
 
   // 5. Wikipedia summary fallback
   const wiki = await wikiSearch(lastMsg);
