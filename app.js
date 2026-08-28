@@ -2011,41 +2011,29 @@ async function genImage(prompt) {
   }
 
   const seed = Math.floor(Math.random() * 9999999);
-
-  // ── Smart prompt engineering ──────────────────────────────
   const lp = prompt.toLowerCase();
 
-  // Auto-detect best FLUX model based on prompt content
-  const isRealistic = /photo|realistic|real|portrait|person|face|human|selfie|landscape|nature|city|street|product|food|animal|dog|cat|sky|sunset|sunrise|building|architecture/i.test(lp);
-  const isAnime = /anime|manga|cartoon|illustration|art style|drawn|painted|digital art|fantasy art|concept art/i.test(lp);
+  // Smart model selection — flux-realism for photos, flux for everything else
+  const isPhoto = /photo|realistic|real person|selfie|human face|portrait photo|product photo|food photo/i.test(lp);
+  const model = isPhoto ? "flux-realism" : "flux";
 
-  let model = "flux";                  // default — best general quality
-  if (isRealistic) model = "flux-realism";  // photorealistic
-  if (isAnime)    model = "flux";           // flux handles artistic well
-
-  // Auto-detect aspect ratio from prompt
-  let width = 1024, height = 1024;     // default square
-  if (/portrait|vertical|tall|phone wallpaper|mobile wallpaper|9:16/i.test(lp)) {
-    width = 768; height = 1344;        // portrait
-  } else if (/landscape|wide|horizontal|desktop wallpaper|cinematic|widescreen|16:9|banner/i.test(lp)) {
-    width = 1344; height = 768;        // landscape
+  // Auto aspect ratio detection
+  let width = 1024, height = 1024;
+  if (/portrait|phone wallpaper|mobile wallpaper|\b9:16\b/i.test(lp)) {
+    width = 768; height = 1344;
+  } else if (/\blandscape\b|desktop wallpaper|widescreen|\b16:9\b|cinematic banner/i.test(lp)) {
+    width = 1344; height = 768;
   }
 
-  // Enhance prompt with quality boosters
-  const qualityBoost = isRealistic
-    ? ", ultra realistic, 8K resolution, sharp focus, professional photography, perfect lighting, highly detailed"
-    : ", highly detailed, vibrant colors, sharp, masterpiece quality, 4K";
-  const enhancedPrompt = prompt + qualityBoost;
+  // Minimal quality boost — just a few words, nothing that overwrites the prompt
+  const boost = isPhoto ? ", highly detailed, sharp, professional" : ", highly detailed, vibrant, sharp";
+  const finalPrompt = prompt + boost;
 
-  // ── Try FLUX models in order ──────────────────────────────
+  // 4-layer fallback — no enhance=true (it rewrites and breaks prompts)
   const attempts = [
-    // 1st try: best matching FLUX model
-    `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?model=${model}&width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`,
-    // 2nd try: flux (universal fallback)
-    `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?model=flux&width=${width}&height=${height}&seed=${seed}&nologo=true`,
-    // 3rd try: flux without enhancements (most compatible)
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?model=${model}&width=${width}&height=${height}&seed=${seed}&nologo=true`,
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?model=flux&width=${width}&height=${height}&seed=${seed}&nologo=true`,
     `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=flux&width=1024&height=1024&seed=${seed}&nologo=true`,
-    // 4th try: no model param (Pollinations auto-selects)
     `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&nologo=true`,
   ];
 
@@ -2061,7 +2049,6 @@ async function genImage(prompt) {
 
   throw new Error("Image generation failed. Please try again with a different prompt.");
 }
-
 
 // ─── IMAGE CARD ───────────────────────────────────────────
 function renderImage(url, prompt) {
