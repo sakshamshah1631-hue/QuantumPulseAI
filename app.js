@@ -2011,20 +2011,57 @@ async function genImage(prompt) {
   }
 
   const seed = Math.floor(Math.random() * 9999999);
-  // Try with API key first, then without
-  const urls = [
-    FREE_IMAGE_ENDPOINT + encodeURIComponent(prompt) + "?width=1024&height=1024&seed=" + seed + "&nologo=true&key=" + POLLINATIONS_API_KEY,
-    FREE_IMAGE_ENDPOINT + encodeURIComponent(prompt) + "?width=1024&height=1024&seed=" + seed + "&nologo=true",
+
+  // ── Smart prompt engineering ──────────────────────────────
+  const lp = prompt.toLowerCase();
+
+  // Auto-detect best FLUX model based on prompt content
+  const isRealistic = /photo|realistic|real|portrait|person|face|human|selfie|landscape|nature|city|street|product|food|animal|dog|cat|sky|sunset|sunrise|building|architecture/i.test(lp);
+  const isAnime = /anime|manga|cartoon|illustration|art style|drawn|painted|digital art|fantasy art|concept art/i.test(lp);
+
+  let model = "flux";                  // default — best general quality
+  if (isRealistic) model = "flux-realism";  // photorealistic
+  if (isAnime)    model = "flux";           // flux handles artistic well
+
+  // Auto-detect aspect ratio from prompt
+  let width = 1024, height = 1024;     // default square
+  if (/portrait|vertical|tall|phone wallpaper|mobile wallpaper|9:16/i.test(lp)) {
+    width = 768; height = 1344;        // portrait
+  } else if (/landscape|wide|horizontal|desktop wallpaper|cinematic|widescreen|16:9|banner/i.test(lp)) {
+    width = 1344; height = 768;        // landscape
+  }
+
+  // Enhance prompt with quality boosters
+  const qualityBoost = isRealistic
+    ? ", ultra realistic, 8K resolution, sharp focus, professional photography, perfect lighting, highly detailed"
+    : ", highly detailed, vibrant colors, sharp, masterpiece quality, 4K";
+  const enhancedPrompt = prompt + qualityBoost;
+
+  // ── Try FLUX models in order ──────────────────────────────
+  const attempts = [
+    // 1st try: best matching FLUX model
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?model=${model}&width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`,
+    // 2nd try: flux (universal fallback)
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?model=flux&width=${width}&height=${height}&seed=${seed}&nologo=true`,
+    // 3rd try: flux without enhancements (most compatible)
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=flux&width=1024&height=1024&seed=${seed}&nologo=true`,
+    // 4th try: no model param (Pollinations auto-selects)
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&nologo=true`,
   ];
 
-  for (const url of urls) {
-    const ok = await new Promise(res => {
-      const i = new Image(); i.onload = () => res(url); i.onerror = () => res(null); i.src = url;
+  for (const url of attempts) {
+    const result = await new Promise(res => {
+      const img = new Image();
+      img.onload = () => res(url);
+      img.onerror = () => res(null);
+      img.src = url;
     });
-    if (ok) return ok;
+    if (result) return result;
   }
-  throw new Error("Image generation failed. Please try again.");
+
+  throw new Error("Image generation failed. Please try again with a different prompt.");
 }
+
 
 // ─── IMAGE CARD ───────────────────────────────────────────
 function renderImage(url, prompt) {
@@ -2118,9 +2155,9 @@ Make sure to generate EXACTLY ${targetScenes} detailed scenes in the JSON array!
     const sc = storyData.scenes[i];
     if (updateProgress) updateProgress(`🎨 Step 2/3: Generating AI scene artwork (${i + 1}/${total})...`);
     try {
-      sc.imageUrl = await genImage(sc.imagePrompt + ", cinematic lighting, 8k resolution, vivid photorealistic fantasy masterpiece");
+      sc.imageUrl = await genImage(sc.imagePrompt + ", cinematic lighting, 8K resolution, vivid photorealistic fantasy masterpiece");
     } catch (err) {
-      sc.imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(sc.imagePrompt)}?width=1024&height=576&seed=${i + 10}`;
+      sc.imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(sc.imagePrompt + ", cinematic, detailed, masterpiece")}?model=flux&width=1024&height=576&seed=${i + 10}&nologo=true`;
     }
   }
 
